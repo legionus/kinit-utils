@@ -1,0 +1,316 @@
+--- kinit/do_mounts.h	2009-10-28 14:52:36 +0300
++++ kinit/do_mounts.h	2009-10-28 14:52:36 +0300
+@@ -7,8 +7,12 @@
+ 
+ #include <sys/types.h>
+ #include <sys/sysmacros.h>
+ #include <sys/stat.h>
++#include <linux/fs.h>
++
++#define __makedev(__ma, __mi) \
++	((((__ma) & 0xfff) << 8)|((__mi) & 0xff)|(((__mi) & 0xfff00) << 12))
+ 
+ #define	Root_RAM0	__makedev(1,0)
+ 
+ /* These device numbers are only used internally */
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/Makefile	2009-10-28 14:53:37 +0300
+@@ -0,0 +1,35 @@
++srctree = $(CURDIR)
++
++objs  = name_to_dev.o devname.o getarg.o
++objs += kinit.o do_mounts.o ramdisk_load.o initrd.o
++objs += getintfile.o readfile.o xpio.o
++objs += do_mounts_md.o do_mounts_mtd.o nfsroot.o
++
++CFLAGS  += -Os -I. -D_GNU_SOURCE -ffunction-sections -fdata-sections
++LDFLAGS += -Wl,--gc-sections -Wl,--print-gc-sections
++
++subdirs += ipconfig
++subdirs += nfsmount
++subdirs += run-init
++subdirs += fstype
++subdirs += resume
++
++# Additional include paths files
++CFLAGS +=  -I$(srctree)/$(src)/fstype \
++           -I$(srctree)/$(src)/ipconfig \
++  	   -I$(srctree)/$(src)/nfsmount \
++  	   -I$(srctree)/$(src)/resume \
++ 	   -I$(srctree)/$(src)/run-init
++
++.PHONY: $(subdirs)
++.EXPORT_ALL_VARIABLES:
++
++all: $(subdirs)
++
++$(subdirs): $(objs)
++	$(MAKE) -C "$@" $(MFLAGS) $(MAKECMDGOALS)
++
++clean: $(subdirs)
++	rm -f -- $(objs)
++
++install: $(subdirs)
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/rules.mk	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,13 @@
++bindir ?= /usr/bin
++
++$(prog): $(objs)
++	$(CC) $(LDFLAGS) -o $@ $(objs) $(LDLIBS)
++
++all: $(prog)
++
++clean:
++	rm -f -- $(prog) $(objs)
++
++install: $(prog)
++	mkdir -p -- $(DESTDIR)$(bindir)
++	install -s -m755 -- $(prog) $(DESTDIR)$(bindir)
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/ipconfig/Makefile	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,9 @@
++prog = ipconfig
++# common .o files
++objs := main.o netdev.o packet.o
++# dhcp
++objs += dhcp_proto.o
++# bootp
++objs += bootp_proto.o
++
++include $(CURDIR)/../rules.mk
+--- kinit/ipconfig/netdev.c	2009-10-28 14:52:36 +0300
++++ kinit/ipconfig/netdev.c	2009-10-28 14:52:36 +0300
+@@ -10,9 +10,9 @@
+ #include <unistd.h>
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ #include <netinet/in.h>
+-#include <linux/route.h>
++#include <net/route.h>
+ 
+ #include "netdev.h"
+ 
+ static int cfd = -1;
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/md.h	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,32 @@
++/* ----------------------------------------------------------------------- *
++ *
++ *   Copyright 2006 H. Peter Anvin - All Rights Reserved
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License as published by
++ *   the Free Software Foundation, Inc., 53 Temple Place Ste 330,
++ *   Boston MA 02111-1307, USA; either version 2 of the License, or
++ *   (at your option) any later version; incorporated herein by reference.
++ *
++ * ----------------------------------------------------------------------- */
++
++/*
++ * sys/md.h
++ *
++ * Defines for the Linux md functionality.  Some of this stuff is
++ * userspace-visible but lives in md_k.h, which is user-space unsafe.
++ * Sigh.
++ */
++
++#ifndef _SYS_MD_H
++#define _SYS_MD_H
++
++#define LEVEL_MULTIPATH         (-4)
++#define LEVEL_LINEAR            (-1)
++#define LEVEL_FAULTY            (-5)
++#define MAX_MD_DEVS  256	/* Max number of md dev */
++
++#include <linux/raid/md_u.h>
++#include <linux/raid/md_p.h>
++
++#endif				/* _SYS_MD_H */
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/run-init/Makefile	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,5 @@
++prog = run-init
++# common .o files
++objs = run-init.o runinitlib.o
++
++include $(CURDIR)/../rules.mk
+--- kinit/nfsroot.c	2009-10-28 14:52:36 +0300
++++ kinit/nfsroot.c	2009-10-28 14:52:36 +0300
+@@ -1,16 +1,17 @@
+ #include <arpa/inet.h>
+ #include <sys/mount.h>
+ #include <sys/stat.h>
++#include <sys/capability.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <assert.h>
+ 
+ #include "ipconfig.h"
+ #include "kinit.h"
+ #include "netdev.h"
+-#include "nfsmount.h"
++//#include "nfsmount.h"
+ 
+ static char *sub_client(__u32 client, char *path, size_t len)
+ {
+ 	struct in_addr addr = { client };
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/resume/Makefile	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,7 @@
++prog = resume
++# common .o files
++objs = resume.o resumelib.o ../getarg.o ../name_to_dev.o ../devname.o
++
++CFLAGS += -I..
++
++include $(CURDIR)/../rules.mk
+--- kinit/resume/resume.c	2009-10-28 14:52:36 +0300
++++ kinit/resume/resume.c	2009-10-28 14:52:36 +0300
+@@ -8,9 +8,9 @@
+ #include "resume.h"
+ 
+ char *progname;
+ 
+-static __noreturn usage(void)
++static void __attribute__ ((noreturn)) usage(void)
+ {
+ 	fprintf(stderr, "Usage: %s /dev/<resumedevice> [offset]\n", progname);
+ 	exit(1);
+ }
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/fstype/Makefile	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,4 @@
++prog =  fstype
++objs = main.o fstype.o
++
++include $(CURDIR)/../rules.mk
+--- kinit/fstype/fstype.c	2009-10-28 14:52:36 +0300
++++ kinit/fstype/fstype.c	2009-10-28 14:52:36 +0300
+@@ -9,18 +9,18 @@
+  * We currently detect the filesystems listed below in the struct
+  * "imagetype images" (in the order they are listed).
+  */
+ 
+-#include <sys/types.h>
+ #include <stdio.h>
+-#include <ctype.h>
+ #include <string.h>
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <endian.h>
+ #include <netinet/in.h>
+ #include <sys/utsname.h>
+ #include <sys/vfs.h>
++#include <linux/types.h>
++#include <asm/byteorder.h>
+ 
+ #define cpu_to_be32(x) __cpu_to_be32(x)	/* Needed by romfs_fs.h */
+ 
+ #include "romfs_fs.h"
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/nfsmount/Makefile	2009-10-28 14:52:36 +0300
+@@ -0,0 +1,4 @@
++prog = nfsmount
++objs = main.o mount.o portmap.o dummypmap.o sunrpc.o
++
++include $(CURDIR)/../rules.mk
+--- kinit/nfsmount/nfsmount.h	2009-10-28 14:52:36 +0300
++++ kinit/nfsmount/nfsmount.h	2009-10-28 14:52:36 +0300
+@@ -1,7 +1,9 @@
+ #ifndef NFSMOUNT_NFSMOUNT_H
+ #define NFSMOUNT_NFSMOUNT_H
+ 
++#include <sys/socket.h>
++#include <stdint.h>
+ #include <linux/nfs_mount.h>
+ 
+ extern int nfs_port;
+ 
+--- kinit/nfsmount/main.c	2009-10-28 14:52:36 +0300
++++ kinit/nfsmount/main.c	2009-10-28 14:52:36 +0300
+@@ -1,19 +1,15 @@
+ #include <errno.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#include <arpa/inet.h>
+ #include <limits.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <signal.h>
+ #include <setjmp.h>
+ #include <sys/wait.h>
+ #include <unistd.h>
+-#include <klibc/sysconfig.h>	/* For _KLIBC_NO_MMU */
+-
+-#include <linux/nfs_mount.h>
+ 
+ #include "nfsmount.h"
+ #include "sunrpc.h"
+ #include "dummypmap.h"
+--- kinit/nfsmount/mount.c	2009-10-28 14:52:36 +0300
++++ kinit/nfsmount/mount.c	2009-10-28 14:52:36 +0300
+@@ -1,15 +1,14 @@
+ #include <sys/mount.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+-#include <arpa/inet.h>
+-#include <netinet/in.h>
+-#include <linux/nfs.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
+ 
++#include <linux/nfs.h>
++
+ #include "nfsmount.h"
+ #include "sunrpc.h"
+ 
+ static uint32_t mount_port;
+--- kinit/nfsmount/portmap.c	2009-10-28 14:52:36 +0300
++++ kinit/nfsmount/portmap.c	2009-10-28 14:52:36 +0300
+@@ -1,6 +1,5 @@
+ #include <sys/types.h>
+-#include <netinet/in.h>
+ #include <asm/byteorder.h>	/* __constant_hton* */
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+--- kinit/nfsmount/sunrpc.c	2009-10-28 14:52:36 +0300
++++ kinit/nfsmount/sunrpc.c	2009-10-28 14:52:36 +0300
+@@ -1,7 +1,6 @@
+ #include <sys/types.h>
+ #include <sys/socket.h>
+-#include <netinet/in.h>
+ #include <errno.h>
+ #include <poll.h>
+ #include <stdio.h>
+ #include <string.h>
+--- kinit/kinit.c	2009-10-28 14:52:36 +0300
++++ kinit/kinit.c	2009-10-28 14:52:36 +0300
+@@ -8,8 +8,9 @@
+ #include <alloca.h>
+ #include <limits.h>
+ #include <ctype.h>
+ #include <termios.h>
++#include <unistd.h>
+ 
+ #include "kinit.h"
+ #include "ipconfig.h"
+ #include "run-init.h"
+--- kinit/do_mounts_md.c	2009-10-28 14:52:36 +0300
++++ kinit/do_mounts_md.c	2009-10-28 14:52:36 +0300
+@@ -16,9 +16,9 @@
+ #include <unistd.h>
+ #include <alloca.h>
+ #include <inttypes.h>
+ #include <sys/sysmacros.h>
+-#include <sys/md.h>
++#include "md.h"
+ #include <linux/major.h>
+ 
+ #include "kinit.h"
+ #include "do_mounts.h"

@@ -1,0 +1,44 @@
+--- kinit/Makefile.fix1	2009-10-28 02:14:45 +0300
++++ kinit/Makefile	2009-10-28 02:14:54 +0300
+@@ -11,8 +11,9 @@ subdirs += ipconfig
+ subdirs += nfsmount
+ subdirs += run-init
+ subdirs += fstype
+ subdirs += resume
++subdirs += md_run
+ 
+ # Additional include paths files
+ CFLAGS +=  -I$(srctree)/$(src)/fstype \
+            -I$(srctree)/$(src)/ipconfig \
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/md_run/md_run.c	2009-10-28 02:13:54 +0300
+@@ -0,0 +1,22 @@
++/*
++ * Handle autoconfiguration of md devices.
++ *
++ * Processes "md=..." and "raid=..." parameters passed as separate
++ * command arguments, ignores other parameters.
++ */
++
++#include <sys/stat.h>
++#include "kinit.h"
++
++/* Create the device node "name" */
++int create_dev(const char *name, dev_t dev)
++{
++	unlink(name);
++	return mknod(name, S_IFBLK | 0600, dev);
++}
++
++int main(int argc, char *argv[])
++{
++	md_run(argc - 1, argv + 1);
++	return 0;
++}
+--- /dev/null	2009-10-26 16:14:39 +0300
++++ kinit/md_run/Makefile	2009-10-28 02:13:54 +0300
+@@ -0,0 +1,4 @@
++prog = md_run
++objs := ../do_mounts_md.o ../name_to_dev.o ../devname.o ../getarg.o md_run.o
++CFLAGS += -I..
++include $(CURDIR)/../rules.mk
