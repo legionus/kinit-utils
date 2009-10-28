@@ -11,6 +11,7 @@ Packager: Alexey Gladkov <legion@altlinux.ru>
 Source0: %name-%version.tar
 Patch0:  klibc.patch
 Patch1:  md_run.patch
+Patch2:  misc-progs.patch
 
 %description
 This package contains a collection of programs that are linked against
@@ -23,6 +24,7 @@ embedded systems.
 %setup -q
 %patch0 -p0 -b .fix0
 %patch1 -p0 -b .fix1
+%patch2 -p0 -b .fix2
 
 %build
 %make_build
