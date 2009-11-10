@@ -11,7 +11,11 @@ Packager: Alexey Gladkov <legion@altlinux.ru>
 Source0: %name-%version.tar
 Patch0:  klibc.patch
 Patch1:  md_run.patch
-Patch2:  misc-progs.patch
+Patch2:  replace.patch
+Patch3:  showenv.patch
+
+# Automatically added by buildreq on Wed Nov 11 2009
+BuildRequires: libcap-devel zlib-devel
 
 %description
 This package contains a collection of programs that are linked against
@@ -25,14 +29,20 @@ embedded systems.
 %patch0 -p0 -b .fix0
 %patch1 -p0 -b .fix1
 %patch2 -p0 -b .fix2
+%patch3 -p0 -b .fix3
 
 %build
 %make_build
 
 %install
-%make_install DESTDIR=%buildroot install
+%make_install \
+	bindir=%buildroot/lib/initrd/bin \
+	install
 
 %files
-%_bindir/*
+/lib/initrd
 
 %changelog
+* Tue Nov 10 2009 Alexey Gladkov <legion@altlinux.ru> 1.5.15-alt1
+- First build for Sisyphus.
+
