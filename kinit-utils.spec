@@ -1,6 +1,6 @@
 Name: kinit-utils
 Version: 1.5.15
-Release: alt1
+Release: alt2
 
 Summary: Small utilities built with klibc
 License: BSD/GPL
@@ -43,6 +43,9 @@ embedded systems.
 /lib/initrd
 
 %changelog
+* Thu Nov 12 2009 Alexey Gladkov <legion@altlinux.ru> 1.5.15-alt2
+- Fix build with new kernel headers.
+
 * Tue Nov 10 2009 Alexey Gladkov <legion@altlinux.ru> 1.5.15-alt1
 - First build for Sisyphus.
 
