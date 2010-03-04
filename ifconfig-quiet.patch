@@ -1,0 +1,155 @@
+--- kinit/ipconfig/main.c.fix	2010-03-05 01:37:59.000000000 +0300
++++ kinit/ipconfig/main.c	2010-03-05 02:20:54.000000000 +0300
+@@ -2,8 +2,9 @@
+ #include <poll.h>
+ #include <limits.h>
+ #include <setjmp.h>
+ #include <stdio.h>
++#include <stdarg.h>
+ #include <string.h>
+ #include <stdlib.h>
+ #include <time.h>
+ #include <arpa/inet.h>
+@@ -30,8 +31,9 @@ static unsigned int default_caps = CAP_D
+ static int loop_timeout = -1;
+ static int configured;
+ static int bringup_first = 0;
+ static int do_readonly = 0;
++static int do_quiet = 0;
+ 
+ /* DHCP vendor class identifier */
+ char vendor_class_identifier[260];
+ int vendor_class_identifier_len;
+@@ -54,10 +56,22 @@ static inline const char *my_inet_ntoa(u
+ 
+ 	return inet_ntoa(a);
+ }
+ 
++static void message(char *fmt, ...)
++{
++	if (do_quiet)
++		return;
++	va_list ap;
++	va_start(ap, fmt);
++	vprintf(fmt, ap);
++	va_end(ap);
++}
++
+ static void print_device_config(struct netdev *dev)
+ {
++	if (do_quiet)
++		return;
+ 	printf("IP-Config: %s complete (from %s):\n", dev->name,
+ 	       my_inet_ntoa(dev->serverid ? dev->serverid : dev->ip_server));
+ 	printf(" address: %-16s ", my_inet_ntoa(dev->ip_addr));
+ 	printf("broadcast: %-16s ", my_inet_ntoa(dev->ip_broadcast));
+@@ -81,20 +95,20 @@ static void configure_device(struct netd
+ 	if (do_not_config)
+ 		return;
+ 
+ 	if (netdev_setmtu(dev))
+-		printf("IP-Config: failed to set MTU on %s to %u\n",
++		message("IP-Config: failed to set MTU on %s to %u\n",
+ 		       dev->name, dev->mtu);
+ 
+ 	if (netdev_setaddress(dev))
+-		printf("IP-Config: failed to set addresses on %s\n",
++		message("IP-Config: failed to set addresses on %s\n",
+ 		       dev->name);
+ 	if (netdev_setdefaultroute(dev))
+-		printf("IP-Config: failed to set default route on %s\n",
++		message("IP-Config: failed to set default route on %s\n",
+ 		       dev->name);
+ 	if (dev->hostname[0] &&
+ 			sethostname(dev->hostname, strlen(dev->hostname)))
+-		printf("IP-Config: failed to set hostname '%s' from %s\n",
++		message("IP-Config: failed to set hostname '%s' from %s\n",
+ 			dev->hostname, dev->name);
+ }
+ 
+ static void dump_device_config(struct netdev *dev)
+@@ -143,20 +157,20 @@ static uint32_t inet_class_netmask(uint3
+ static void postprocess_device(struct netdev *dev)
+ {
+ 	if (dev->ip_netmask == INADDR_ANY) {
+ 		dev->ip_netmask = inet_class_netmask(dev->ip_addr);
+-		printf("IP-Config: %s guessed netmask %s\n",
++		message("IP-Config: %s guessed netmask %s\n",
+ 		       dev->name, my_inet_ntoa(dev->ip_netmask));
+ 	}
+ 	if (dev->ip_broadcast == INADDR_ANY) {
+ 		dev->ip_broadcast =
+ 		    (dev->ip_addr & dev->ip_netmask) | ~dev->ip_netmask;
+-		printf("IP-Config: %s guessed broadcast address %s\n",
++		message("IP-Config: %s guessed broadcast address %s\n",
+ 		       dev->name, my_inet_ntoa(dev->ip_broadcast));
+ 	}
+ 	if (dev->ip_nameserver[0] == INADDR_ANY) {
+ 		dev->ip_nameserver[0] = dev->ip_server;
+-		printf("IP-Config: %s guessed nameserver address %s\n",
++		message("IP-Config: %s guessed nameserver address %s\n",
+ 		       dev->name, my_inet_ntoa(dev->ip_nameserver[0]));
+ 	}
+ }
+ 
+@@ -383,9 +397,9 @@ static int loop(void)
+ 			}
+ 
+ 			if (loop_timeout >= 0 &&
+ 			    now.tv_sec - start >= loop_timeout) {
+-				printf("IP-Config: no response after %d "
++				message("IP-Config: no response after %d "
+ 				       "secs - giving up\n", loop_timeout);
+ 				goto bail;
+ 			}
+ 
+@@ -604,12 +618,12 @@ static struct netdev *add_device(const c
+ 
+ 	if (bootp_init_if(dev) == -1)
+ 		goto bail;
+ 
+-	printf("IP-Config: %s hardware address", dev->name);
++	message("IP-Config: %s hardware address", dev->name);
+ 	for (i = 0; i < dev->hwlen; i++)
+-		printf("%c%02x", i == 0 ? ' ' : ':', dev->hwaddr[i]);
+-	printf(" mtu %d%s%s\n", dev->mtu,
++		message("%c%02x", i == 0 ? ' ' : ':', dev->hwaddr[i]);
++	message(" mtu %d%s%s\n", dev->mtu,
+ 	       dev->caps & CAP_DHCP ? " DHCP" :
+ 	       dev->caps & CAP_BOOTP ? " BOOTP" : "",
+ 	       dev->caps & CAP_RARP ? " RARP" : "");
+ 	return dev;
+@@ -730,9 +744,9 @@ int ipconfig_main(int argc, char *argv[]
+ 	/* Default vendor identifier */
+ 	set_vendor_identifier("Linux ipconfig");
+ 
+ 	do {
+-		c = getopt(argc, argv, "c:d:i:onp:rt:");
++		c = getopt(argc, argv, "c:d:i:onp:rt:q");
+ 		if (c == EOF)
+ 			break;
+ 
+ 		switch (c) {
+@@ -770,8 +784,11 @@ int ipconfig_main(int argc, char *argv[]
+ 			break;
+ 		case 'r':
+ 			do_readonly = 1;
+ 			break;
++		case 'q':
++			do_quiet = 1;
++			break;
+ 		case 'd':
+ 			dev = add_device(optarg);
+ 			if (dev)
+ 				bringup_device(dev);
+@@ -790,9 +807,9 @@ int ipconfig_main(int argc, char *argv[]
+ 	}
+ 
+ 	if (check_autoconfig()) {
+ 		if (cfg_local_port != LOCAL_PORT) {
+-			printf("IP-Config: binding source port to %d, "
++			message("IP-Config: binding source port to %d, "
+ 			       "dest to %d\n",
+ 			       cfg_local_port, cfg_remote_port);
+ 		}
+ 		loop();
