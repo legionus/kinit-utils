@@ -1,6 +1,6 @@
 Name: kinit-utils
 Version: 1.5.15
-Release: alt2
+Release: alt3
 
 Summary: Small utilities built with klibc
 License: BSD/GPL
@@ -13,6 +13,8 @@ Patch0:  klibc.patch
 Patch1:  md_run.patch
 Patch2:  replace.patch
 Patch3:  showenv.patch
+Patch4:  ifconfig-readonly-fs.patch
+Patch5:  ifconfig-quiet.patch
 
 # Automatically added by buildreq on Wed Nov 11 2009
 BuildRequires: libcap-devel zlib-devel
@@ -30,6 +32,8 @@ embedded systems.
 %patch1 -p0 -b .fix1
 %patch2 -p0 -b .fix2
 %patch3 -p0 -b .fix3
+%patch4 -p0 -b .fix4
+%patch5 -p0 -b .fix5
 
 %build
 %make_build
@@ -43,6 +47,11 @@ embedded systems.
 /lib/initrd
 
 %changelog
+* Fri Mar 05 2010 Alexey Gladkov <legion@altlinux.ru> 1.5.15-alt3
+- ipconfig:
+  + Add -r option;
+  + Add -q option.
+
 * Thu Nov 12 2009 Alexey Gladkov <legion@altlinux.ru> 1.5.15-alt2
 - Fix build with new kernel headers.
 
