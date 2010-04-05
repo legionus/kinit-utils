@@ -1,1 +1,2 @@
-./kinit: klibc/usr/kinit: klibc-1.5.15-16-gf9f820a
+./kinit: klibc/usr/kinit: klibc-1.5.17-2-g9339767
+
