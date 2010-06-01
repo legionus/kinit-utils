@@ -1,6 +1,6 @@
 Name: kinit-utils
-Version: 1.5.15
-Release: alt3
+Version: 1.5.17
+Release: alt1
 
 Summary: Small utilities built with klibc
 License: BSD/GPL
@@ -15,6 +15,7 @@ Patch2:  replace.patch
 Patch3:  showenv.patch
 Patch4:  ifconfig-readonly-fs.patch
 Patch5:  ifconfig-quiet.patch
+Patch6:  halt.patch
 
 # Automatically added by buildreq on Wed Nov 11 2009
 BuildRequires: libcap-devel zlib-devel
@@ -34,6 +35,7 @@ embedded systems.
 %patch3 -p0 -b .fix3
 %patch4 -p0 -b .fix4
 %patch5 -p0 -b .fix5
+%patch6 -p0 -b .fix6
 
 %build
 %make_build
@@ -42,11 +44,17 @@ embedded systems.
 %make_install \
 	bindir=%buildroot/lib/initrd/bin \
 	install
+ln -s halt %buildroot/lib/initrd/bin/reboot
+ln -s halt %buildroot/lib/initrd/bin/poweroff
 
 %files
 /lib/initrd
 
 %changelog
+* Tue Apr 06 2010 Alexey Gladkov <legion@altlinux.ru> 1.5.17-alt1
+- Update sources.
+- Add halt utility.
+
 * Fri Mar 05 2010 Alexey Gladkov <legion@altlinux.ru> 1.5.15-alt3
 - ipconfig:
   + Add -r option;
