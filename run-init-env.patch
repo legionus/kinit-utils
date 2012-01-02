@@ -1,0 +1,140 @@
+--- kinit/run-init/runinitlib.c.fix7	2012-01-03 01:14:37.000000000 +0400
++++ kinit/run-init/runinitlib.c	2012-01-03 01:20:10.884333011 +0400
+@@ -153,15 +153,53 @@ static int nuke(const char *what)
+ 		return 0;
+ 	}
+ }
+ 
+-const char *run_init(const char *realroot, const char *console,
++static int set_environ(const char *fname)
++{
++	FILE *fp;
++	int rc = 0;
++	char *v, *s, *line = NULL;
++	size_t len = 0;
++	ssize_t n;
++
++	if ((fp = fopen(fname, "r")) == NULL) {
++		rc = errno;
++		goto end;
++	}
++	clearenv();
++	while ((n = getline(&line, &len, fp)) != -1) {
++		line[n-1] = '\0';
++		if (!strlen(line))
++			continue;
++		s = strchr(line, '=');
++		if (!s)
++			continue;
++		v = s + 1;
++		*s = '\0';
++		if (setenv(line, v, 1) == -1) {
++			rc = errno;
++			goto end;
++		}
++	}
++end:
++	if (line)
++		free(line);
++	if (fp)
++		fclose(fp);
++	return rc;
++}
++
++const char *run_init(const char *realroot, const char *console, const char *envfile,
+ 		     const char *init, char **initargs)
+ {
+ 	struct stat rst, cst, ist;
+ 	struct statfs sfs;
+ 	int confd;
+ 
++	if (envfile && set_environ(envfile))
++		return "can't setup environ";
++
+ 	/* First, change to the new root directory */
+ 	if (chdir(realroot))
+ 		return "chdir to new root";
+ 
+--- kinit/run-init/run-init.c.fix7	2012-01-03 01:14:37.000000000 +0400
++++ kinit/run-init/run-init.c	2012-01-03 01:14:38.388480633 +0400
+@@ -49,17 +49,18 @@ static const char *program;
+ 
+ static void __attribute__ ((noreturn)) usage(void)
+ {
+ 	fprintf(stderr,
+-		"Usage: exec %s [-c consoledev] /real-root /sbin/init [args]\n",
++		"Usage: exec %s [-c consoledev] [-e envfile] /real-root /sbin/init [args]\n",
+ 		program);
+ 	exit(1);
+ }
+ 
+ int main(int argc, char *argv[])
+ {
+ 	/* Command-line options and defaults */
+ 	const char *console = "/dev/console";
++	const char *envfile = NULL;
+ 	const char *realroot;
+ 	const char *init;
+ 	const char *error;
+ 	char **initargs;
+@@ -69,13 +70,18 @@ int main(int argc, char *argv[])
+ 
+ 	/* Parse the command line */
+ 	program = argv[0];
+ 
+-	while ((o = getopt(argc, argv, "c:")) != -1) {
+-		if (o == 'c') {
+-			console = optarg;
+-		} else {
+-			usage();
++	while ((o = getopt(argc, argv, "c:e:")) != -1) {
++		switch (o) {
++			case 'c':
++				console = optarg;
++				break;
++			case 'e':
++				envfile = optarg;
++				break;
++			default:
++				usage();
+ 		}
+ 	}
+ 
+ 	if (argc - optind < 2)
+@@ -84,9 +90,9 @@ int main(int argc, char *argv[])
+ 	realroot = argv[optind];
+ 	init = argv[optind + 1];
+ 	initargs = argv + optind + 1;
+ 
+-	error = run_init(realroot, console, init, initargs);
++	error = run_init(realroot, console, envfile, init, initargs);
+ 
+ 	/* If run_init returns, something went wrong */
+ 	fprintf(stderr, "%s: %s: %s\n", program, error, strerror(errno));
+ 	return 1;
+--- kinit/run-init/run-init.h.fix7	2012-01-03 01:14:37.000000000 +0400
++++ kinit/run-init/run-init.h	2012-01-03 01:14:38.389380143 +0400
+@@ -27,8 +27,9 @@
+ 
+ #ifndef RUN_INIT_H
+ #define RUN_INIT_H
+ 
+-const char *run_init(const char *realroot, const char *console,
++const char *run_init(const char *realroot,
++		     const char *console, const char *envfile,
+ 		     const char *init, char **initargs);
+ 
+ #endif
+--- kinit/kinit.c.fix7	2012-01-03 01:14:38.330012468 +0400
++++ kinit/kinit.c	2012-01-03 01:14:38.390279653 +0400
+@@ -307,9 +307,9 @@ int main(int argc, char *argv[])
+ 	}
+ 
+ 	init_argv[0] = strrchr(init_path, '/') + 1;
+ 
+-	errmsg = run_init("/root", "/dev/console", init_path, init_argv);
++	errmsg = run_init("/root", "/dev/console", NULL, init_path, init_argv);
+ 
+ 	/* If run_init returned, something went bad */
+ 	fprintf(stderr, "%s: %s: %s\n", progname, errmsg, strerror(errno));
+ 	ret = 2;
