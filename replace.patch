@@ -1,98 +1,166 @@
---- /dev/null	2009-11-04 03:18:01 +0300
-+++ kinit/replace/replace.c	2009-11-10 01:29:43 +0300
-@@ -0,0 +1,161 @@
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/replace/replace.c	2012-02-09 17:30:37.326496926 +0400
+@@ -0,0 +1,238 @@
 +//#define SIMPLE 1
 +
++#include <stdio.h>
++#include <string.h>
 +#include <unistd.h>
++#include <ctype.h>
 +#ifndef SIMPLE
 +#include <stdlib.h>
 +#endif
 +
-+static const char usage[] = "Usage: replace [-s<char>] [-q] <src> <dst> [<string> ...]\n";
++static const char usage[] = "Usage: replace [-s<stop-at-char>] [-r] [-q] <src> <dst> [<string> ...]\n";
++static int revert = 0;
 +static int quote = 0;
 +static char stop_at = '\0';
 +
 +static void
-+write_ch(const char c) {
++write_ch(const char c)
++{
 +	if (write(1, &c, 1) == -1)
 +		_exit(1);
 +}
 +
 +static void
-+print_ch(const char c) {
++print_ch(const char c)
++{
 +	if (quote && (c == '\\' || c == '"' || c == '$' || c == '`'))
 +		write_ch('\\');
 +	write_ch(c);
 +}
 +
 +#ifndef SIMPLE
-+static void
-+write_err(const char *s) {
-+	if (write(2, s, sizeof(&s)-1) == -1)
-+		_exit(1);
++#define err(x) do { \
++		if (write(2, x, strlen(x)) > 0 && write(2, "\n", 1) > 0) {}; \
++		_exit(1); \
++	} while(0)
++
++static char *
++add_sequence(char *res, size_t *rlen, unsigned int *i, char *str, size_t len)
++{
++	size_t j = 0;
++	size_t siz = (*rlen);
++
++	while (siz < (strlen(res) + 1 + len)) {
++		siz += BUFSIZ;
++		if (!(res = realloc(res, siz)))
++			err("realloc failed");
++	}
++
++	while (str && j < len)
++		res[(*i)++] = str[j++];
++	res[(*i)] = '\0';
++
++	(*rlen) = siz;
++	return res;
 +}
 +
-+#define err(x) { write_err(x); _exit(1); }
 +static char *
-+expand(char *src) {
-+	int i = 0, class = 0, ri = 0;
-+	char prev = '\0';
-+	char sequence[2] = { '\0', '\0' };
-+	char *res = NULL;
++expand_sequence(char *res, size_t *rlen, unsigned int *i, char from, char to)
++{
++	size_t siz = (*rlen);
 +
-+	res = (char *) malloc (sizeof(&src)-1);
-+	if (!res) err("malloc failed");
++	while (siz < (strlen(res) + 1 + (unsigned)(to - from))) {
++		siz += BUFSIZ;
++		if (!(res = realloc(res, siz)))
++			err("realloc failed");
++	}
++
++	while (to >= from)
++		res[(*i)++] = from++;
++	res[(*i)] = '\0';
++
++	(*rlen) = siz;
++	return res;
++}
++
++static char *
++expand(char *src)
++{
++	unsigned int i = 0, ri = 0, class = 0;
++	char prev = '\0';
++
++	char *res = NULL;
++	size_t rlen = BUFSIZ;
++
++	if (!(res = (char *) malloc(rlen)))
++		err("malloc failed");
++	res[0] = '\0';
 +
 +	while (src[i]) {
-+		if (prev != '\\') {
-+			switch (src[i]) {
-+				case '[':
-+					if (class)
++		if (prev == '\\') {
++			res = add_sequence(res, &rlen, &ri, src + i++, 1);
++			prev = '\0';
++			continue;
++		}
++
++		switch (src[i]) {
++			case '[':
++				if (class) {
++					// http://www.regular-expressions.info/posixbrackets.html
++
++					if (!strncasecmp(src + i, "[:xdigit:]", 10)) {
++						res = expand_sequence(res, &rlen, &ri, 'A', 'F');
++						res = expand_sequence(res, &rlen, &ri, 'a', 'f');
++						res = expand_sequence(res, &rlen, &ri, '0', '9');
++						i += 10;
++					} else if (!strncasecmp(src + i, "[:word:]", 8)) {
++						res = expand_sequence(res, &rlen, &ri, 'A', 'Z');
++						res = expand_sequence(res, &rlen, &ri, 'a', 'z');
++						res = expand_sequence(res, &rlen, &ri, '0', '9');
++						res =    add_sequence(res, &rlen, &ri, "_", 1);
++						i += 8;
++					} else if (!strncasecmp(src + i, "[:alnum:]", 9)) {
++						res = expand_sequence(res, &rlen, &ri, 'A', 'Z');
++						res = expand_sequence(res, &rlen, &ri, 'a', 'z');
++						res = expand_sequence(res, &rlen, &ri, '0', '9');
++						i += 9;
++					} else if (!strncasecmp(src + i, "[:alpha:]", 9)) {
++						res = expand_sequence(res, &rlen, &ri, 'A', 'Z');
++						res = expand_sequence(res, &rlen, &ri, 'a', 'z');
++						i += 9;
++					} else if (!strncasecmp(src + i, "[:digit:]", 9)) {
++						res = expand_sequence(res, &rlen, &ri, '0', '9');
++						i += 9;
++					} else if (!strncasecmp(src + i, "[:upper:]", 9)) {
++						res = expand_sequence(res, &rlen, &ri, 'A', 'Z');
++						i += 9;
++					} else if (!strncasecmp(src + i, "[:lower:]", 9)) {
++						res = expand_sequence(res, &rlen, &ri, 'a', 'z');
++						i += 9;
++					} else if (!strncasecmp(src + i, "[:blank:]", 9)) {
++						res = add_sequence(res, &rlen, &ri, " \t", 2);
++						i += 9;
++					} else if (!strncasecmp(src + i, "[:space:]", 9)) {
++						res = add_sequence(res, &rlen, &ri, " \t\r\n\v\f", 6);
++						i += 9;
++					} else {
 +						err("Unexpected symbol `['\n");
-+					class = 1;
-+					goto end2;
-+				case ']':
-+					if (!class)
-+						err("Unexpected symbol `]'\n");
-+					class = 0;
-+					goto end2;
-+				case '-':
-+					if (class && src[i+1] != '\0') {
-+						if (sequence[1] == prev)
-+							err("Unexpected symbol `-'\n");
-+
-+						sequence[0] = prev;
-+						sequence[1] = src[i+1];
-+						goto end2;
 +					}
-+			}
++					continue;
++				}
++				class = 1;
++				break;
++			case ']':
++				if (!class)
++					err("Unexpected symbol `]'\n");
++				class = 0;
++				break;
++			case '\\':
++				break;
++			default:
++				if (class && strlen(src + i) >= 3) {
++					if (isalnum(src[i]) && isalnum(src[i + 2]) && src[i + 1] == '-') {
++						res = expand_sequence(res, &rlen, &ri, src[i], src[i + 2]);
++						i += 3;
++						continue;
++					}
++				}
++				res = add_sequence(res, &rlen, &ri, src + i, 1);
 +		}
-+
-+		if (src[i] == '\\') {
-+			if (prev == '\\') {
-+				res[ri++] = '\\';
-+				goto end2; 
-+			}
-+			goto end1;
-+		}
-+
-+		if (src[i] == sequence[1]) {
-+			res = realloc(res, sizeof(&res)+(unsigned)(sequence[1]-sequence[0]));
-+			if (!res) err("realloc failed");
-+
-+			while (sequence[1] >= sequence[0])
-+				res[ri++] = sequence[0]++;
-+			goto end1;
-+		}
-+
-+		if (!class)
-+			res[ri++] = src[i];
-+
-+end1:		prev = src[i++];
-+		continue;
-+
-+end2:		prev = '\0';
-+		i++;
++		prev = src[i++];
 +	}
 +	if (class)
 +		err("Unexpected end of pattern\n");
@@ -103,7 +171,8 @@
 +#endif
 +
 +int
-+main(int argc, char **argv) {
++main(int argc, char **argv)
++{
 +	size_t i = 1, j, k, len = 0;
 +	char *src, *dst;
 +
@@ -118,6 +187,8 @@
 +			break;
 +		else if (argv[i][1] == 'q')
 +			quote = 1;
++		else if (argv[i][1] == 'r')
++			revert = 1;
 +		else if (argv[i][1] == 's' && argv[i][2])
 +			stop_at = argv[i][2];
 +		i++;
@@ -130,7 +201,10 @@
 +	src = argv[i++];
 +	dst = argv[i++];
 +#endif
-+	while (dst[len++]);
++//	printf("src={%s}\n", src);
++//	printf("dst={%s}\n", dst);
++
++	while (dst[len]) len++;
 +
 +	while (argv[i]) {
 +		if (quote) write_ch('"');
@@ -142,11 +216,14 @@
 +			k = 0;
 +			while (src[k] && argv[i][j] != src[k]) k++;
 +
-+			if (src[k]) {
-+				if (k < len) print_ch(dst[k]);
-+			}
++			if (revert)
++				(!src[k])
++					? print_ch(dst[len - 1])
++					: print_ch(argv[i][j]);
 +			else
-+				print_ch(argv[i][j]);
++				(src[k])
++					? print_ch(dst[(k < len) ? k : len - 1])
++					: print_ch(argv[i][j]);
 +			j++;
 +		}
 +		while (argv[i][j])
@@ -162,9 +239,15 @@
 +#endif
 +	return 0;
 +}
---- /dev/null	2009-11-04 03:18:01 +0300
-+++ kinit/replace/Makefile	2009-11-10 01:29:43 +0300
-@@ -0,0 +1,3 @@
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/replace/Makefile	2012-02-09 02:22:41.446214429 +0400
+@@ -0,0 +1,9 @@
++WARNINGS = -Wall -Wextra -Wmissing-noreturn -Wdisabled-optimization \
++	-Wcast-align -Wshadow -Wmissing-format-attribute -Wmissing-prototypes \
++	-Wstrict-prototypes -Wmissing-declarations
++
++CFLAGS  += -D_GNU_SOURCE $(WARNINGS)
++
 +prog = replace
 +objs = replace.o
 +include $(CURDIR)/../rules.mk

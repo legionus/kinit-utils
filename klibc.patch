@@ -1,20 +1,5 @@
---- kinit/do_mounts.h.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/do_mounts.h	2010-04-06 00:39:06.000000000 +0400
-@@ -7,8 +7,12 @@
- 
- #include <sys/types.h>
- #include <sys/sysmacros.h>
- #include <sys/stat.h>
-+#include <linux/fs.h>
-+
-+#define __makedev(__ma, __mi) \
-+	((((__ma) & 0xfff) << 8)|((__mi) & 0xff)|(((__mi) & 0xfff00) << 12))
- 
- #define	Root_RAM0	__makedev(1,0)
- 
- /* These device numbers are only used internally */
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/Makefile	2010-04-06 00:39:06.000000000 +0400
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/Makefile	2012-02-09 18:20:54.129496981 +0400
 @@ -0,0 +1,35 @@
 +srctree = $(CURDIR)
 +
@@ -51,24 +36,114 @@
 +	rm -f -- $(objs)
 +
 +install: $(subdirs)
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/rules.mk	2010-04-06 00:39:06.000000000 +0400
-@@ -0,0 +1,13 @@
-+bindir ?= /usr/bin
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/nfsmount/Makefile	2012-02-09 18:20:54.130496981 +0400
+@@ -0,0 +1,5 @@
++prog = nfsmount
++objs = main.o mount.o portmap.o dummypmap.o sunrpc.o
++CFLAGS += -D_GNU_SOURCE=1
 +
-+$(prog): $(objs)
-+	$(CC) $(LDFLAGS) -o $@ $(objs) $(LDLIBS)
++include $(CURDIR)/../rules.mk
+--- kinit/nfsmount/sunrpc.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/nfsmount/sunrpc.c	2012-02-09 18:20:54.131496981 +0400
+@@ -1,8 +1,7 @@
+ #include <sys/types.h>
+ #include <sys/socket.h>
+-#include <netinet/in.h>
+-#include <poll.h>
++#include <sys/poll.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdlib.h>
+ 
+--- kinit/nfsmount/mount.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/nfsmount/mount.c	2012-02-09 18:20:54.132496981 +0400
+@@ -1,15 +1,14 @@
+ #include <sys/mount.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+-#include <arpa/inet.h>
+-#include <netinet/in.h>
+-#include <linux/nfs.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
+ 
++#include <linux/nfs.h>
 +
-+all: $(prog)
+ #include "nfsmount.h"
+ #include "sunrpc.h"
+ 
+ static uint32_t mount_port;
+--- kinit/nfsmount/nfsmount.h.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/nfsmount/nfsmount.h	2012-02-09 18:20:54.133496981 +0400
+@@ -1,9 +1,19 @@
+ #ifndef NFSMOUNT_NFSMOUNT_H
+ #define NFSMOUNT_NFSMOUNT_H
+ 
++#include <sys/socket.h>
++#include <stdint.h>
+ #include <linux/nfs_mount.h>
+ 
++#ifndef MNTPROC_MNT
++#define MNTPROC_MNT	1
++#endif
 +
-+clean:
-+	rm -f -- $(prog) $(objs)
++#ifndef MNTPROC_UMNT
++#define MNTPROC_UMNT	3
++#endif
 +
-+install: $(prog)
-+	mkdir -p -- $(DESTDIR)$(bindir)
-+	install -s -m755 -- $(prog) $(DESTDIR)$(bindir)
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/ipconfig/Makefile	2010-04-06 00:39:06.000000000 +0400
+ extern int nfs_port;
+ 
+ extern int nfsmount_main(int argc, char *argv[]);
+ int nfs_mount(const char *rem_name, const char *hostname,
+--- kinit/nfsmount/main.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/nfsmount/main.c	2012-02-09 18:20:54.135496981 +0400
+@@ -1,19 +1,15 @@
+ #include <errno.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#include <arpa/inet.h>
+ #include <limits.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <signal.h>
+ #include <setjmp.h>
+ #include <sys/wait.h>
+ #include <unistd.h>
+-#include <klibc/sysconfig.h>	/* For _KLIBC_NO_MMU */
+-
+-#include <linux/nfs_mount.h>
+ 
+ #include "nfsmount.h"
+ #include "sunrpc.h"
+ #include "dummypmap.h"
+--- kinit/nfsmount/portmap.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/nfsmount/portmap.c	2012-02-09 18:20:54.136496981 +0400
+@@ -1,6 +1,5 @@
+ #include <sys/types.h>
+-#include <netinet/in.h>
+ #include <asm/byteorder.h>	/* __constant_hton* */
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+--- kinit/do_mounts_md.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/do_mounts_md.c	2012-02-09 18:20:54.137496981 +0400
+@@ -15,9 +15,9 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <inttypes.h>
+ #include <sys/sysmacros.h>
+-#include <sys/md.h>
++#include "md.h"
+ #include <linux/major.h>
+ 
+ #include "kinit.h"
+ #include "do_mounts.h"
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/ipconfig/Makefile	2012-02-09 18:20:54.138496981 +0400
 @@ -0,0 +1,9 @@
 +prog = ipconfig
 +# common .o files
@@ -79,8 +154,8 @@
 +objs += bootp_proto.o
 +
 +include $(CURDIR)/../rules.mk
---- kinit/ipconfig/netdev.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/ipconfig/netdev.c	2010-04-06 00:40:29.000000000 +0400
+--- kinit/ipconfig/netdev.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/ipconfig/netdev.c	2012-02-09 18:20:54.139496981 +0400
 @@ -10,9 +10,9 @@
  #include <unistd.h>
  #include <net/if.h>
@@ -92,8 +167,31 @@
  
  #include "netdev.h"
  
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/md.h	2010-04-06 00:39:06.000000000 +0400
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/run-init/Makefile	2012-02-09 18:20:54.140496981 +0400
+@@ -0,0 +1,5 @@
++prog = run-init
++# common .o files
++objs = run-init.o runinitlib.o
++
++include $(CURDIR)/../rules.mk
+--- kinit/do_mounts.h.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/do_mounts.h	2012-02-09 18:20:54.141496981 +0400
+@@ -7,8 +7,12 @@
+ 
+ #include <sys/types.h>
+ #include <sys/sysmacros.h>
+ #include <sys/stat.h>
++#include <linux/fs.h>
++
++#define __makedev(__ma, __mi) \
++	((((__ma) & 0xfff) << 8)|((__mi) & 0xff)|(((__mi) & 0xfff00) << 12))
+ 
+ #define	Root_RAM0	__makedev(1, 0)
+ 
+ /* These device numbers are only used internally */
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/md.h	2012-02-09 18:20:54.142496981 +0400
 @@ -0,0 +1,32 @@
 +/* ----------------------------------------------------------------------- *
 + *
@@ -127,17 +225,9 @@
 +#include <linux/raid/md_p.h>
 +
 +#endif				/* _SYS_MD_H */
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/run-init/Makefile	2010-04-06 00:39:06.000000000 +0400
-@@ -0,0 +1,5 @@
-+prog = run-init
-+# common .o files
-+objs = run-init.o runinitlib.o
-+
-+include $(CURDIR)/../rules.mk
---- kinit/nfsroot.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/nfsroot.c	2010-04-06 00:39:06.000000000 +0400
-@@ -1,16 +1,17 @@
+--- kinit/nfsroot.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/nfsroot.c	2012-02-09 18:22:38.077496910 +0400
+@@ -1,15 +1,16 @@
  #include <arpa/inet.h>
  #include <sys/mount.h>
  #include <sys/stat.h>
@@ -147,7 +237,6 @@
  #include <string.h>
  #include <assert.h>
  
- #include "ipconfig.h"
  #include "kinit.h"
  #include "netdev.h"
 -#include "nfsmount.h"
@@ -156,8 +245,8 @@
  static char *sub_client(__u32 client, char *path, size_t len)
  {
  	struct in_addr addr = { client };
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/resume/Makefile	2010-04-06 00:39:06.000000000 +0400
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/resume/Makefile	2012-02-09 18:20:54.144496981 +0400
 @@ -0,0 +1,7 @@
 +prog = resume
 +# common .o files
@@ -166,8 +255,8 @@
 +CFLAGS += -I..
 +
 +include $(CURDIR)/../rules.mk
---- kinit/resume/resume.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/resume/resume.c	2010-04-06 00:39:06.000000000 +0400
+--- kinit/resume/resume.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/resume/resume.c	2012-02-09 18:20:54.145496981 +0400
 @@ -8,9 +8,9 @@
  #include "resume.h"
  
@@ -179,15 +268,43 @@
  	fprintf(stderr, "Usage: %s /dev/<resumedevice> [offset]\n", progname);
  	exit(1);
  }
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/fstype/Makefile	2010-04-06 00:39:06.000000000 +0400
+--- kinit/kinit.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/kinit.c	2012-02-09 18:20:54.146496981 +0400
+@@ -8,8 +8,9 @@
+ #include <alloca.h>
+ #include <limits.h>
+ #include <ctype.h>
+ #include <termios.h>
++#include <unistd.h>
+ 
+ #include "kinit.h"
+ #include "ipconfig.h"
+ #include "run-init.h"
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/rules.mk	2012-02-09 18:20:54.147496981 +0400
+@@ -0,0 +1,13 @@
++bindir ?= /usr/bin
++
++$(prog): $(objs)
++	$(CC) $(LDFLAGS) -o $@ $(objs) $(LDLIBS)
++
++all: $(prog)
++
++clean:
++	rm -f -- $(prog) $(objs)
++
++install: $(prog)
++	mkdir -p -- $(DESTDIR)$(bindir)
++	install -s -m755 -- $(prog) $(DESTDIR)$(bindir)
+--- /dev/null	2012-02-09 20:31:42.211948750 +0400
++++ kinit/fstype/Makefile	2012-02-09 18:20:54.148496981 +0400
 @@ -0,0 +1,4 @@
 +prog =  fstype
 +objs = main.o fstype.o
 +
 +include $(CURDIR)/../rules.mk
---- kinit/fstype/fstype.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/fstype/fstype.c	2010-04-06 00:39:06.000000000 +0400
+--- kinit/fstype/fstype.c.fix0	2012-02-09 18:20:53.000000000 +0400
++++ kinit/fstype/fstype.c	2012-02-09 18:20:54.149496981 +0400
 @@ -9,18 +9,18 @@
   * We currently detect the filesystems listed below in the struct
   * "imagetype images" (in the order they are listed).
@@ -208,123 +325,4 @@
  
  #define cpu_to_be32(x) __cpu_to_be32(x)	/* Needed by romfs_fs.h */
  
- #include "romfs_fs.h"
---- /dev/null	2010-04-01 20:01:56.248009121 +0400
-+++ kinit/nfsmount/Makefile	2010-04-06 00:39:06.000000000 +0400
-@@ -0,0 +1,5 @@
-+prog = nfsmount
-+objs = main.o mount.o portmap.o dummypmap.o sunrpc.o
-+CFLAGS += -D_GNU_SOURCE=1
-+
-+include $(CURDIR)/../rules.mk
---- kinit/nfsmount/nfsmount.h.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/nfsmount/nfsmount.h	2010-04-06 00:39:06.000000000 +0400
-@@ -1,9 +1,19 @@
- #ifndef NFSMOUNT_NFSMOUNT_H
- #define NFSMOUNT_NFSMOUNT_H
- 
-+#include <sys/socket.h>
-+#include <stdint.h>
- #include <linux/nfs_mount.h>
- 
-+#ifndef MNTPROC_MNT
-+#define MNTPROC_MNT	1
-+#endif
-+
-+#ifndef MNTPROC_UMNT
-+#define MNTPROC_UMNT	3
-+#endif
-+
- extern int nfs_port;
- 
- extern int nfsmount_main(int argc, char *argv[]);
- int nfs_mount(const char *rem_name, const char *hostname,
---- kinit/nfsmount/main.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/nfsmount/main.c	2010-04-06 00:39:06.000000000 +0400
-@@ -1,19 +1,15 @@
- #include <errno.h>
- #include <sys/types.h>
- #include <sys/stat.h>
--#include <arpa/inet.h>
- #include <limits.h>
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
- #include <signal.h>
- #include <setjmp.h>
- #include <sys/wait.h>
- #include <unistd.h>
--#include <klibc/sysconfig.h>	/* For _KLIBC_NO_MMU */
--
--#include <linux/nfs_mount.h>
- 
- #include "nfsmount.h"
- #include "sunrpc.h"
- #include "dummypmap.h"
---- kinit/nfsmount/mount.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/nfsmount/mount.c	2010-04-06 00:39:06.000000000 +0400
-@@ -1,15 +1,14 @@
- #include <sys/mount.h>
- #include <sys/types.h>
- #include <sys/socket.h>
--#include <arpa/inet.h>
--#include <netinet/in.h>
--#include <linux/nfs.h>
- #include <stdio.h>
- #include <stdlib.h>
- #include <string.h>
- #include <errno.h>
- 
-+#include <linux/nfs.h>
-+
- #include "nfsmount.h"
- #include "sunrpc.h"
- 
- static uint32_t mount_port;
---- kinit/nfsmount/portmap.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/nfsmount/portmap.c	2010-04-06 00:39:06.000000000 +0400
-@@ -1,6 +1,5 @@
- #include <sys/types.h>
--#include <netinet/in.h>
- #include <asm/byteorder.h>	/* __constant_hton* */
- #include <stdio.h>
- #include <stdlib.h>
- 
---- kinit/nfsmount/sunrpc.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/nfsmount/sunrpc.c	2010-04-06 00:39:06.000000000 +0400
-@@ -1,9 +1,8 @@
- #include <sys/types.h>
- #include <sys/socket.h>
--#include <netinet/in.h>
-+#include <sys/poll.h>
- #include <errno.h>
--#include <poll.h>
- #include <stdio.h>
- #include <string.h>
- #include <stdlib.h>
- 
---- kinit/kinit.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/kinit.c	2010-04-06 00:39:06.000000000 +0400
-@@ -8,8 +8,9 @@
- #include <alloca.h>
- #include <limits.h>
- #include <ctype.h>
- #include <termios.h>
-+#include <unistd.h>
- 
- #include "kinit.h"
- #include "ipconfig.h"
- #include "run-init.h"
---- kinit/do_mounts_md.c.fix0	2010-04-06 00:39:04.000000000 +0400
-+++ kinit/do_mounts_md.c	2010-04-06 00:39:06.000000000 +0400
-@@ -16,9 +16,9 @@
- #include <unistd.h>
- #include <alloca.h>
- #include <inttypes.h>
- #include <sys/sysmacros.h>
--#include <sys/md.h>
-+#include "md.h"
- #include <linux/major.h>
- 
- #include "kinit.h"
- #include "do_mounts.h"
+ #include "btrfs.h"

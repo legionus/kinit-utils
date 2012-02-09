@@ -45,8 +45,8 @@
  			dev = add_device(optarg);
  			if (dev)
  				bringup_device(dev);
---- kinit/ipconfig/README.fix4	2010-01-08 00:25:20 +0300
-+++ kinit/ipconfig/README	2010-01-08 00:25:20 +0300
+--- kinit/ipconfig/README.ipconfig.fix4	2010-01-08 00:25:20 +0300
++++ kinit/ipconfig/README.ipconfig	2010-01-08 00:25:20 +0300
 @@ -3,17 +3,18 @@ BOOTP/DHCP client for klibc
  
  Usage:

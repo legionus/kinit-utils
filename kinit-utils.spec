@@ -1,6 +1,6 @@
 Name: kinit-utils
-Version: 1.5.17
-Release: alt2
+Version: 1.5.25
+Release: alt1
 
 Summary: Small utilities built with klibc
 License: BSD/GPL
@@ -49,10 +49,22 @@ embedded systems.
 ln -s halt %buildroot/lib/initrd/bin/reboot
 ln -s halt %buildroot/lib/initrd/bin/poweroff
 
+rm -f %buildroot/lib/initrd/bin/fstype
+
 %files
 /lib/initrd
 
 %changelog
+* Thu Feb 09 2012 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt1
+- Update kinit sources upto klibc-1.5.25-28-gdfd907c.
+- replace:
+  + Add posix character classes;
+  + Add -r (revert) option;
+  + Fix bugs.
+- showenv:
+  + Add -s (shell) option;
+- Drop 'fstype' unused utility.
+
 * Tue Jan 03 2012 Alexey Gladkov <legion@altlinux.ru> 1.5.17-alt2
 - run-init:
   + Add -e option.

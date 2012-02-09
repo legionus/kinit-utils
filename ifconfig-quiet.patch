@@ -1,6 +1,6 @@
---- kinit/ipconfig/main.c.fix	2010-03-05 01:37:59.000000000 +0300
-+++ kinit/ipconfig/main.c	2010-03-05 02:20:54.000000000 +0300
-@@ -2,8 +2,9 @@
+--- kinit/ipconfig/main.c.fix5	2012-02-09 18:24:38.502496983 +0400
++++ kinit/ipconfig/main.c	2012-02-09 18:27:25.014496980 +0400
+@@ -1,8 +1,9 @@
  #include <poll.h>
  #include <limits.h>
  #include <setjmp.h>
@@ -10,7 +10,7 @@
  #include <stdlib.h>
  #include <time.h>
  #include <arpa/inet.h>
-@@ -30,8 +31,9 @@ static unsigned int default_caps = CAP_D
+@@ -29,8 +30,9 @@ static unsigned int default_caps = CAP_D
  static int loop_timeout = -1;
  static int configured;
  static int bringup_first = 0;
@@ -20,7 +20,7 @@
  /* DHCP vendor class identifier */
  char vendor_class_identifier[260];
  int vendor_class_identifier_len;
-@@ -54,10 +56,22 @@ static inline const char *my_inet_ntoa(u
+@@ -53,10 +55,22 @@ static inline const char *my_inet_ntoa(u
  
  	return inet_ntoa(a);
  }
@@ -43,7 +43,7 @@
  	       my_inet_ntoa(dev->serverid ? dev->serverid : dev->ip_server));
  	printf(" address: %-16s ", my_inet_ntoa(dev->ip_addr));
  	printf("broadcast: %-16s ", my_inet_ntoa(dev->ip_broadcast));
-@@ -81,20 +95,20 @@ static void configure_device(struct netd
+@@ -80,20 +94,20 @@ static void configure_device(struct netd
  	if (do_not_config)
  		return;
  
@@ -67,8 +67,8 @@
  			dev->hostname, dev->name);
  }
  
- static void dump_device_config(struct netdev *dev)
-@@ -143,20 +157,20 @@ static uint32_t inet_class_netmask(uint3
+ /*
+@@ -170,15 +184,15 @@ static uint32_t inet_class_netmask(uint3
  static void postprocess_device(struct netdev *dev)
  {
  	if (dev->ip_netmask == INADDR_ANY) {
@@ -84,15 +84,9 @@
 +		message("IP-Config: %s guessed broadcast address %s\n",
  		       dev->name, my_inet_ntoa(dev->ip_broadcast));
  	}
- 	if (dev->ip_nameserver[0] == INADDR_ANY) {
- 		dev->ip_nameserver[0] = dev->ip_server;
--		printf("IP-Config: %s guessed nameserver address %s\n",
-+		message("IP-Config: %s guessed nameserver address %s\n",
- 		       dev->name, my_inet_ntoa(dev->ip_nameserver[0]));
- 	}
  }
  
-@@ -383,9 +397,9 @@ static int loop(void)
+@@ -418,9 +432,9 @@ static int loop(void)
  			}
  
  			if (loop_timeout >= 0 &&
@@ -100,10 +94,10 @@
 -				printf("IP-Config: no response after %d "
 +				message("IP-Config: no response after %d "
  				       "secs - giving up\n", loop_timeout);
+ 				rc = -1;
  				goto bail;
  			}
- 
-@@ -604,12 +618,12 @@ static struct netdev *add_device(const c
+@@ -638,12 +652,12 @@ static struct netdev *add_device(const c
  
  	if (bootp_init_if(dev) == -1)
  		goto bail;
@@ -119,7 +113,7 @@
  	       dev->caps & CAP_BOOTP ? " BOOTP" : "",
  	       dev->caps & CAP_RARP ? " RARP" : "");
  	return dev;
-@@ -730,9 +744,9 @@ int ipconfig_main(int argc, char *argv[]
+@@ -765,9 +779,9 @@ int ipconfig_main(int argc, char *argv[]
  	/* Default vendor identifier */
  	set_vendor_identifier("Linux ipconfig");
  
@@ -130,7 +124,7 @@
  			break;
  
  		switch (c) {
-@@ -770,8 +784,11 @@ int ipconfig_main(int argc, char *argv[]
+@@ -805,8 +819,11 @@ int ipconfig_main(int argc, char *argv[]
  			break;
  		case 'r':
  			do_readonly = 1;
@@ -142,7 +136,7 @@
  			dev = add_device(optarg);
  			if (dev)
  				bringup_device(dev);
-@@ -790,9 +807,9 @@ int ipconfig_main(int argc, char *argv[]
+@@ -825,9 +842,9 @@ int ipconfig_main(int argc, char *argv[]
  	}
  
  	if (check_autoconfig()) {
@@ -152,4 +146,4 @@
  			       "dest to %d\n",
  			       cfg_local_port, cfg_remote_port);
  		}
- 		loop();
+ 		err = loop();

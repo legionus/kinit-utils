@@ -1,6 +1,6 @@
---- kinit/run-init/runinitlib.c.fix7	2012-01-03 01:14:37.000000000 +0400
-+++ kinit/run-init/runinitlib.c	2012-01-03 01:20:10.884333011 +0400
-@@ -153,15 +153,53 @@ static int nuke(const char *what)
+--- kinit/run-init/runinitlib.c.fix7	2012-02-09 18:28:15.000000000 +0400
++++ kinit/run-init/runinitlib.c	2012-02-09 18:29:59.129497046 +0400
+@@ -152,15 +152,53 @@ static int nuke(const char *what)
  		return 0;
  	}
  }
@@ -44,7 +44,7 @@
 +const char *run_init(const char *realroot, const char *console, const char *envfile,
  		     const char *init, char **initargs)
  {
- 	struct stat rst, cst, ist;
+ 	struct stat rst, cst;
  	struct statfs sfs;
  	int confd;
  
@@ -55,8 +55,8 @@
  	if (chdir(realroot))
  		return "chdir to new root";
  
---- kinit/run-init/run-init.c.fix7	2012-01-03 01:14:37.000000000 +0400
-+++ kinit/run-init/run-init.c	2012-01-03 01:14:38.388480633 +0400
+--- kinit/run-init/run-init.c.fix7	2012-02-09 18:28:15.000000000 +0400
++++ kinit/run-init/run-init.c	2012-02-09 18:28:15.935496981 +0400
 @@ -49,17 +49,18 @@ static const char *program;
  
  static void __attribute__ ((noreturn)) usage(void)
@@ -112,8 +112,8 @@
  	/* If run_init returns, something went wrong */
  	fprintf(stderr, "%s: %s: %s\n", program, error, strerror(errno));
  	return 1;
---- kinit/run-init/run-init.h.fix7	2012-01-03 01:14:37.000000000 +0400
-+++ kinit/run-init/run-init.h	2012-01-03 01:14:38.389380143 +0400
+--- kinit/run-init/run-init.h.fix7	2012-02-09 18:28:15.000000000 +0400
++++ kinit/run-init/run-init.h	2012-02-09 18:28:15.936496980 +0400
 @@ -27,8 +27,9 @@
  
  #ifndef RUN_INIT_H
@@ -125,9 +125,9 @@
  		     const char *init, char **initargs);
  
  #endif
---- kinit/kinit.c.fix7	2012-01-03 01:14:38.330012468 +0400
-+++ kinit/kinit.c	2012-01-03 01:14:38.390279653 +0400
-@@ -307,9 +307,9 @@ int main(int argc, char *argv[])
+--- kinit/kinit.c.fix7	2012-02-09 18:28:15.873496980 +0400
++++ kinit/kinit.c	2012-02-09 18:28:15.938496981 +0400
+@@ -305,9 +305,9 @@ int main(int argc, char *argv[])
  	}
  
  	init_argv[0] = strrchr(init_path, '/') + 1;
