@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mount.h>
@@ -7,7 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <alloca.h>
 #include <inttypes.h>
 
 #include "do_mounts.h"
@@ -33,8 +31,8 @@ const char *mount_block(const char *source, const char *target,
 	int fd;
 
 	if (type) {
-		DEBUG(("kinit: trying to mount %s on %s with type %s\n",
-		       source, target, type));
+		dprintf("kinit: trying to mount %s on %s with type %s\n",
+			source, target, type);
 		int rv = mount(source, target, type, flags, data);
 		/* Mount readonly if necessary */
 		if (rv == -1 && errno == EACCES && !(flags & MS_RDONLY))
@@ -52,16 +50,16 @@ const char *mount_block(const char *source, const char *target,
 		close(fd);
 
 		if (!err && type) {
-			DEBUG(("kinit: %s appears to be a %s filesystem\n",
-			       source, type));
+			dprintf("kinit: %s appears to be a %s filesystem\n",
+				source, type);
 			type = mount_block(source, target, type, flags, data);
 			if (type)
 				return type;
 		}
 	}
 
-	DEBUG(("kinit: failed to identify filesystem %s, trying all\n",
-	       source));
+	dprintf("kinit: failed to identify filesystem %s, trying all\n",
+		source);
 
 	fsbytes = readfile("/proc/filesystems", &fslist);
 
@@ -80,7 +78,8 @@ const char *mount_block(const char *source, const char *target,
 		if (!p)
 			break;
 		*p++ = '\0';
-		if (*type != '\t')	/* We can't mount a block device as a "nodev" fs */
+		/* We can't mount a block device as a "nodev" fs */
+		if (*type != '\t')
 			continue;
 
 		type++;
@@ -118,7 +117,7 @@ mount_block_root(int argc, char *argv[], dev_t root_dev,
 	    && (rp = mount_block("/dev/root", "/root", NULL, flags, data)))
 		goto ok;
 
-      bad:
+bad:
 	if (errno != EINVAL) {
 		/*
 		 * Allow the user to distinguish between failed open
@@ -133,7 +132,7 @@ mount_block_root(int argc, char *argv[], dev_t root_dev,
 		return -ESRCH;
 	}
 
-      ok:
+ok:
 	printf("%s: Mounted root (%s filesystem)%s.\n",
 	       progname, rp, (flags & MS_RDONLY) ? " readonly" : "");
 	return 0;
@@ -152,7 +151,7 @@ mount_roots(int argc, char *argv[], const char *root_dev_name)
 	while (root) {
 		dev_t root_dev;
 
-		DEBUG(("kinit: trying to mount %s\n", root));
+		dprintf("kinit: trying to mount %s\n", root);
 		root_dev = name_to_dev_t(root);
 		ret = mount_root(argc, argv, root_dev, root);
 		if (!ret)
@@ -171,7 +170,7 @@ mount_root(int argc, char *argv[], dev_t root_dev, const char *root_dev_name)
 	const char *type = get_arg(argc, argv, "rootfstype=");
 
 	if (get_flag(argc, argv, "rw") > get_flag(argc, argv, "ro")) {
-		DEBUG(("kinit: mounting root rw\n"));
+		dprintf("kinit: mounting root rw\n");
 		flags &= ~MS_RDONLY;
 	}
 
@@ -207,7 +206,7 @@ int do_mounts(int argc, char *argv[])
 	const char *load_ramdisk = get_arg(argc, argv, "load_ramdisk=");
 	dev_t root_dev = 0;
 
-	DEBUG(("kinit: do_mounts\n"));
+	dprintf("kinit: do_mounts\n");
 
 	if (root_delay) {
 		int delay = atoi(root_delay);
@@ -229,10 +228,10 @@ int do_mounts(int argc, char *argv[])
 		root_dev = (dev_t) rootdev;
 	}
 
-	DEBUG(("kinit: root_dev = %s\n", bdevname(root_dev)));
+	dprintf("kinit: root_dev = %s\n", bdevname(root_dev));
 
 	if (initrd_load(argc, argv, root_dev)) {
-		DEBUG(("initrd loaded\n"));
+		dprintf("initrd loaded\n");
 		return 0;
 	}
 

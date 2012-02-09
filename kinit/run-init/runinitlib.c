@@ -40,7 +40,6 @@
  * On failure, returns a human-readable error message.
  */
 
-#include <alloca.h>
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -157,7 +156,7 @@ static int nuke(const char *what)
 const char *run_init(const char *realroot, const char *console,
 		     const char *init, char **initargs)
 {
-	struct stat rst, cst, ist;
+	struct stat rst, cst;
 	struct statfs sfs;
 	int confd;
 
@@ -175,10 +174,6 @@ const char *run_init(const char *realroot, const char *console,
 
 	if (rst.st_dev == cst.st_dev)
 		return "current directory on the same filesystem as the root";
-
-	/* The initramfs should have /init */
-	if (stat("/init", &ist) || !S_ISREG(ist.st_mode))
-		return "can't find /init on initramfs";
 
 	/* Make sure we're on a ramfs */
 	if (statfs("/", &sfs))

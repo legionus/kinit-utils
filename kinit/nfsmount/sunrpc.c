@@ -1,7 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
@@ -120,14 +119,14 @@ static int rpc_call_udp(struct client *clnt, struct rpc *rpc)
 				goto bail;
 			}
 			if (ret == 0) {
-				DEBUG(("Timeout #%d\n", i + 1));
+				dprintf("Timeout #%d\n", i + 1);
 				break;
 			}
 			if ((ret = rpc_do_reply(clnt, rpc, UDP_HDR_OFF)) == 0) {
 				goto done;
 			} else {
-				DEBUG(("Failed on try #%d - retrying\n",
-				       i + 1));
+				dprintf("Failed on try #%d - retrying\n",
+					i + 1);
 			}
 		}
 	}

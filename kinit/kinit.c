@@ -19,23 +19,21 @@ const char *progname = "kinit";
 int mnt_procfs;
 int mnt_sysfs;
 
-#ifdef INI_DEBUG
+#ifdef DEBUG
 void dump_args(int argc, char *argv[])
 {
 	int i;
 
 	printf("  argc == %d\n", argc);
 
-	for (i = 0; i < argc; i++) {
+	for (i = 0; i < argc; i++)
 		printf("  argv[%d]: \"%s\"\n", i, argv[i]);
-	}
 
-	if (argv[argc] != NULL) {
+	if (argv[argc] != NULL)
 		printf("  argv[%d]: \"%s\" (SHOULD BE NULL)\n",
-		       argc, argv[argc]);
-	}
+			argc, argv[argc]);
 }
-#endif
+#endif /* DEBUG */
 
 
 static int do_ipconfig(int argc, char *argv[])
@@ -50,7 +48,7 @@ static int do_ipconfig(int argc, char *argv[])
 	args[a++] = (char *)"-i";
 	args[a++] = (char *)"Linux kinit";
 
-	DEBUG(("Running ipconfig\n"));
+	dprintf("Running ipconfig\n");
 
 	for (i = 1; i < argc; i++) {
 		if (strncmp(argv[i], "ip=", 3) == 0 ||
@@ -125,9 +123,8 @@ static int mount_sys_fs(const char *check, const char *fsname,
 {
 	struct stat st;
 
-	if (stat(check, &st) == 0) {
+	if (stat(check, &st) == 0)
 		return 0;
-	}
 
 	mkdir(fsname, 0555);
 
@@ -173,13 +170,13 @@ static const char *find_init(const char *root, const char *user)
 	}
 
 	if (user)
-		DEBUG(("Checking for init: %s\n", user));
+		dprintf("Checking for init: %s\n", user);
 
 	if (user && user[0] == '/' && !access(user+1, X_OK)) {
 		path = user;
 	} else {
 		for (p = init_paths; *p; p++) {
-			DEBUG(("Checking for init: %s\n", *p));
+			dprintf("Checking for init: %s\n", *p);
 			if (!access(*p+1, X_OK))
 				break;
 		}
@@ -220,9 +217,8 @@ int main(int argc, char *argv[])
 		dup2(fd, STDOUT_FILENO);
 		dup2(fd, STDERR_FILENO);
 
-		if (fd > STDERR_FILENO) {
+		if (fd > STDERR_FILENO)
 			close(fd);
-		}
 	}
 
 	mnt_procfs = mount_sys_fs("/proc/cmdline", "/proc", "proc") >= 0;
@@ -287,6 +283,8 @@ int main(int argc, char *argv[])
 
 	check_path("/root");
 	do_mounts(cmdc, cmdv);
+
+	drop_capabilities(get_arg(cmdc, cmdv, "drop_capabilities="));
 
 	if (mnt_procfs) {
 		umount2("/proc", 0);

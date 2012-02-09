@@ -49,8 +49,8 @@ int bootp_send_request(struct netdev *dev)
 	bootp.secs	= htons(time(NULL) - dev->open_time);
 	memcpy(bootp.chaddr, dev->hwaddr, 16);
 
-	DEBUG(("-> bootp xid 0x%08x secs 0x%08x ",
-	       bootp.xid, ntohs(bootp.secs)));
+	dprintf("-> bootp xid 0x%08x secs 0x%08x ",
+		bootp.xid, ntohs(bootp.secs));
 
 	return packet_send(dev, iov, 2);
 }
@@ -169,9 +169,9 @@ int bootp_recv_reply(struct netdev *dev)
 	};
 	int ret;
 
-	ret = packet_recv(iov, 3);
+	ret = packet_recv(dev, iov, 3);
 	if (ret <= 0)
-		return -1;
+		return ret;
 
 	if (ret < sizeof(struct bootp_hdr) ||
 	    bootp.op != BOOTP_REPLY ||	/* RFC951 7.5 */

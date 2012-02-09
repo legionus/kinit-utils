@@ -2,7 +2,6 @@
  * Handle resume from suspend-to-disk
  */
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +67,7 @@ int resume(const char *resume_file, unsigned long long resume_offset)
 	if (len >= sizeof device_string)
 		goto fail_r;
 
-	DEBUG(("kinit: trying to resume from %s\n", resume_file));
+	dprintf("kinit: trying to resume from %s\n", resume_file);
 
 	if (write(powerfd, device_string, len) != len)
 		goto fail_r;
@@ -77,7 +76,7 @@ int resume(const char *resume_file, unsigned long long resume_offset)
 failure:
 	if (powerfd >= 0)
 		close(powerfd);
-	fprintf(stderr, "kinit: No resume image, doing normal boot...\n");
+	dprintf("kinit: No resume image, doing normal boot...\n");
 	return -1;
 
 fail_r:

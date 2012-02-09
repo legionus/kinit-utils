@@ -23,19 +23,20 @@
 
 #define cpu_to_be32(x) __cpu_to_be32(x)	/* Needed by romfs_fs.h */
 
-#include "romfs_fs.h"
+#include "btrfs.h"
 #include "cramfs_fs.h"
-#include "minix_fs.h"
 #include "ext2_fs.h"
 #include "ext3_fs.h"
-#include "xfs_sb.h"
+#include "gfs2_fs.h"
+#include "iso9660_sb.h"
 #include "luks_fs.h"
 #include "lvm2_sb.h"
-#include "iso9660_sb.h"
-#include "squashfs_fs.h"
-#include "gfs2_fs.h"
-#include "ocfs2_fs.h"
+#include "minix_fs.h"
 #include "nilfs_fs.h"
+#include "ocfs2_fs.h"
+#include "romfs_fs.h"
+#include "squashfs_fs.h"
+#include "xfs_sb.h"
 
 /*
  * Slightly cleaned up version of jfs_superblock to
@@ -123,7 +124,7 @@ static int fs_proc_check(const char *fs_name)
 
 	f = fopen("/proc/filesystems", "r");
 	if (!f)
-		return (0);
+		return 0;
 	while (fgets(buf, sizeof(buf), f)) {
 		cp = buf;
 		if (!isspace(*cp)) {
@@ -132,19 +133,22 @@ static int fs_proc_check(const char *fs_name)
 		}
 		while (*cp && isspace(*cp))
 			cp++;
-		if ((t = strchr(cp, '\n')) != NULL)
+		t = strchr(cp, '\n');
+		if (t != NULL)
 			*t = 0;
-		if ((t = strchr(cp, '\t')) != NULL)
+		t = strchr(cp, '\t');
+		if (t != NULL)
 			*t = 0;
-		if ((t = strchr(cp, ' ')) != NULL)
+		t = strchr(cp, ' ');
+		if (t != NULL)
 			*t = 0;
 		if (!strcmp(fs_name, cp)) {
 			fclose(f);
-			return (1);
+			return 1;
 		}
 	}
 	fclose(f);
-	return (0);
+	return 0;
 }
 
 /*
@@ -159,19 +163,21 @@ static int check_for_modules(const char *fs_name)
 	int		i;
 
 	if (uname(&uts))
-		return (0);
+		return 0;
 	snprintf(buf, sizeof(buf), "/lib/modules/%s/modules.dep", uts.release);
 
 	f = fopen(buf, "r");
 	if (!f)
-		return (0);
+		return 0;
 	while (fgets(buf, sizeof(buf), f)) {
-		if ((cp = strchr(buf, ':')) != NULL)
-			*cp = 0;
-		else
+		cp = strchr(buf, ':');
+		if (cp == NULL)
 			continue;
-		if ((cp = strrchr(buf, '/')) != NULL)
-			cp++;
+		*cp = 0;
+		cp = strrchr(buf, '/');
+		if (cp == NULL)
+			continue;
+		cp++;
 		i = strlen(cp);
 		if (i > 3) {
 			t = cp + i - 3;
@@ -180,11 +186,11 @@ static int check_for_modules(const char *fs_name)
 		}
 		if (!strcmp(cp, fs_name)) {
 			fclose(f);
-			return (1);
+			return 1;
 		}
 	}
 	fclose(f);
-	return (0);
+	return 0;
 }
 
 static int base_ext4_image(const void *buf, unsigned long long *bytes,
@@ -194,14 +200,6 @@ static int base_ext4_image(const void *buf, unsigned long long *bytes,
 		(const struct ext3_super_block *)buf;
 
 	if (sb->s_magic != __cpu_to_le16(EXT2_SUPER_MAGIC))
-		return 0;
-
-	/*
-	 * For now, ext4 requires a journal -- but this may change
-	 * soon if we get that patch from Google.  :-)
-	 */
-	if ((sb->s_feature_compat
-	     & __cpu_to_le32(EXT3_FEATURE_COMPAT_HAS_JOURNAL)) == 0)
 		return 0;
 
 	/* There is at least one feature not supported by ext3 */
@@ -325,7 +323,8 @@ static int jfs_image(const void *buf, unsigned long long *bytes)
 	const struct jfs_superblock *sb = (const struct jfs_superblock *)buf;
 
 	if (!memcmp(sb->s_magic, JFS_MAGIC, 4)) {
-		*bytes = __le64_to_cpu(sb->s_size) << __le16_to_cpu(sb->s_l2pbsize);
+		*bytes = __le64_to_cpu(sb->s_size)
+			<< __le16_to_cpu(sb->s_l2pbsize);
 		return 1;
 	}
 	return 0;
@@ -461,6 +460,18 @@ static int nilfs2_image(const void *buf, unsigned long long *bytes)
 	return 0;
 }
 
+static int btrfs_image(const void *buf, unsigned long long *bytes)
+{
+	const struct btrfs_super_block *sb =
+	    (const struct btrfs_super_block *)buf;
+
+	if (!memcmp(sb->magic, BTRFS_MAGIC, BTRFS_MAGIC_L)) {
+		*bytes = (unsigned long long)__le64_to_cpu(sb->total_bytes);
+		return 1;
+	}
+	return 0;
+}
+
 struct imagetype {
 	off_t block;
 	const char name[12];
@@ -496,6 +507,7 @@ static struct imagetype images[] = {
 	{64, "reiserfs", reiserfs_image},
 	{64, "reiser4", reiser4_image},
 	{64, "gfs2", gfs2_image},
+	{64, "btrfs", btrfs_image},
 	{32, "jfs", jfs_image},
 	{32, "iso9660", iso_image},
 	{0, "luks", luks_image},
@@ -510,7 +522,7 @@ int identify_fs(int fd, const char **fstype,
 		unsigned long long *bytes, off_t offset)
 {
 	uint64_t buf[BLOCK_SIZE >> 3];	/* 64-bit worst case alignment */
-	off_t cur_block = (off_t) - 1;
+	off_t cur_block = (off_t) -1;
 	struct imagetype *ip;
 	int ret;
 	unsigned long long dummy;

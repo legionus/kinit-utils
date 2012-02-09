@@ -36,28 +36,26 @@ ssize_t freadfile(FILE *f, char **pptr);
  * "unnecessary" pointer comparison.
  * From the Linux kernel.
  */
-#define min(x,y) ({ \
-        typeof(x) _x = (x);     \
-        typeof(y) _y = (y);     \
-        (void) (&_x == &_y);            \
-        _x < _y ? _x : _y; })
+#define min(x, y) ({ \
+	typeof(x) _x = (x);     \
+	typeof(y) _y = (y);     \
+	(void) (&_x == &_y);            \
+	_x < _y ? _x : _y; })
 
-#define max(x,y) ({ \
-        typeof(x) _x = (x);     \
-        typeof(y) _y = (y);     \
-        (void) (&_x == &_y);            \
-        _x > _y ? _x : _y; })
+#define max(x, y) ({ \
+	typeof(x) _x = (x);     \
+	typeof(y) _y = (y);     \
+	(void) (&_x == &_y);            \
+	_x > _y ? _x : _y; })
 
-#define INI_DEBUG
 
-#undef DEBUG
-#ifdef INI_DEBUG
-#define DEBUG(x) printf x
+#ifdef DEBUG
+# define dprintf printf
 #else
-#define DEBUG(x) do { } while (0)
+# define dprintf(...) ((void)0)
 #endif
 
-#ifdef INI_DEBUG
+#ifdef DEBUG
 void dump_args(int argc, char *argv[]);
 #else
 static inline void dump_args(int argc, char *argv[])
@@ -66,5 +64,7 @@ static inline void dump_args(int argc, char *argv[])
 	(void)argv;
 }
 #endif
+
+int drop_capabilities(const char *caps);
 
 #endif				/* KINIT_H */

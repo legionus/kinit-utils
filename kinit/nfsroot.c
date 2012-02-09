@@ -6,7 +6,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "ipconfig.h"
 #include "kinit.h"
 #include "netdev.h"
 #include "nfsmount.h"
@@ -57,9 +56,8 @@ int mount_nfs_root(int argc, char *argv[], int flags)
 			dev_bootpath = dev->bootpath;
 			break;
 		}
-		if (dev->ip_addr != INADDR_NONE && dev->ip_addr != INADDR_ANY) {
+		if (dev->ip_addr != INADDR_NONE && dev->ip_addr != INADDR_ANY)
 			client = dev->ip_addr;
-		}
 	}
 
 	/*
@@ -94,8 +92,8 @@ int mount_nfs_root(int argc, char *argv[], int flags)
 
 	nfs_argv[a++] = sub_client(client, root, len);
 
-	DEBUG(("NFS-Root: mounting %s on %s with options \"%s\"\n",
-	       nfs_argv[a-1], mtpt, opts ? opts : ""));
+	dprintf("NFS-Root: mounting %s on %s with options \"%s\"\n",
+		nfs_argv[a-1], mtpt, opts ? opts : "");
 
 	nfs_argv[a++] = mtpt;
 	nfs_argv[a] = NULL;
@@ -108,6 +106,6 @@ int mount_nfs_root(int argc, char *argv[], int flags)
 		goto done;
 	}
 
-      done:
+done:
 	return ret;
 }

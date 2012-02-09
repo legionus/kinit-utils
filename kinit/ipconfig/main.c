@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <poll.h>
 #include <limits.h>
 #include <setjmp.h>
@@ -96,6 +95,30 @@ static void configure_device(struct netdev *dev)
 			dev->hostname, dev->name);
 }
 
+/*
+ * Escape shell varialbes in git style:
+ * Always start with a single quote ('), then leave all characters
+ * except ' and ! unchanged.
+ */
+static void write_option(FILE *f, const char *name, const char *chr)
+{
+
+	fprintf(f, "%s='", name);
+	while (*chr) {
+		switch (*chr) {
+		case '!':
+		case '\'':
+			fprintf(f, "'\\%c'", *chr);
+			break;
+		default:
+			fprintf(f, "%c", *chr);
+			break;
+		}
+		++chr;
+	}
+	fprintf(f, "'\n");
+}
+
 static void dump_device_config(struct netdev *dev)
 {
 	char fn[40];
@@ -104,22 +127,26 @@ static void dump_device_config(struct netdev *dev)
 	snprintf(fn, sizeof(fn), "/tmp/net-%s.conf", dev->name);
 	f = fopen(fn, "w");
 	if (f) {
-		fprintf(f, "DEVICE=%s\n", dev->name);
-		fprintf(f, "IPV4ADDR=%s\n", my_inet_ntoa(dev->ip_addr));
-		fprintf(f, "IPV4BROADCAST=%s\n",
-			my_inet_ntoa(dev->ip_broadcast));
-		fprintf(f, "IPV4NETMASK=%s\n", my_inet_ntoa(dev->ip_netmask));
-		fprintf(f, "IPV4GATEWAY=%s\n", my_inet_ntoa(dev->ip_gateway));
-		fprintf(f, "IPV4DNS0=%s\n",
-			my_inet_ntoa(dev->ip_nameserver[0]));
-		fprintf(f, "IPV4DNS1=%s\n",
-			my_inet_ntoa(dev->ip_nameserver[1]));
-		fprintf(f, "HOSTNAME=%s\n", dev->hostname);
-		fprintf(f, "DNSDOMAIN=%s\n", dev->dnsdomainname);
-		fprintf(f, "NISDOMAIN=%s\n", dev->nisdomainname);
-		fprintf(f, "ROOTSERVER=%s\n", my_inet_ntoa(dev->ip_server));
-		fprintf(f, "ROOTPATH=%s\n", dev->bootpath);
-		fprintf(f, "filename=\"%s\"\n", dev->filename);
+		write_option(f, "DEVICE", dev->name);
+		write_option(f, "IPV4ADDR",
+				my_inet_ntoa(dev->ip_addr));
+		write_option(f, "IPV4BROADCAST",
+				my_inet_ntoa(dev->ip_broadcast));
+		write_option(f, "IPV4NETMASK",
+				my_inet_ntoa(dev->ip_netmask));
+		write_option(f, "IPV4GATEWAY",
+				my_inet_ntoa(dev->ip_gateway));
+		write_option(f, "IPV4DNS0",
+				my_inet_ntoa(dev->ip_nameserver[0]));
+		write_option(f, "IPV4DNS1",
+				my_inet_ntoa(dev->ip_nameserver[1]));
+		write_option(f, "HOSTNAME",  dev->hostname);
+		write_option(f, "DNSDOMAIN", dev->dnsdomainname);
+		write_option(f, "NISDOMAIN", dev->nisdomainname);
+		write_option(f, "ROOTSERVER",
+				my_inet_ntoa(dev->ip_server));
+		write_option(f, "ROOTPATH", dev->bootpath);
+		write_option(f, "filename", dev->filename);
 		fclose(f);
 	}
 }
@@ -149,11 +176,6 @@ static void postprocess_device(struct netdev *dev)
 		printf("IP-Config: %s guessed broadcast address %s\n",
 		       dev->name, my_inet_ntoa(dev->ip_broadcast));
 	}
-	if (dev->ip_nameserver[0] == INADDR_ANY) {
-		dev->ip_nameserver[0] = dev->ip_server;
-		printf("IP-Config: %s guessed nameserver address %s\n",
-		       dev->name, my_inet_ntoa(dev->ip_nameserver[0]));
-	}
 }
 
 static void complete_device(struct netdev *dev)
@@ -171,7 +193,7 @@ static void complete_device(struct netdev *dev)
 
 /*
  * Returns:
- *  0 = Not handled, the packet is still in the queue
+ *  0 = Not handled, try again later
  *  1 = Handled
  */
 static int process_receive_event(struct state *s, time_t now)
@@ -179,15 +201,23 @@ static int process_receive_event(struct state *s, time_t now)
 	int handled = 1;
 
 	switch (s->state) {
+	case DEVST_ERROR:
+		return 0; /* Not handled */
+	case DEVST_COMPLETE:
+		return 0; /* Not handled as already configured */
+
 	case DEVST_BOOTP:
 		s->restart_state = DEVST_BOOTP;
 		switch (bootp_recv_reply(s->dev)) {
 		case -1:
 			s->state = DEVST_ERROR;
 			break;
+		case 0:
+			handled = 0;
+			break;
 		case 1:
 			s->state = DEVST_COMPLETE;
-			DEBUG(("\n   bootp reply\n"));
+			dprintf("\n   bootp reply\n");
 			break;
 		}
 		break;
@@ -197,6 +227,9 @@ static int process_receive_event(struct state *s, time_t now)
 		switch (dhcp_recv_offer(s->dev)) {
 		case -1:
 			s->state = DEVST_ERROR;
+			break;
+		case 0:
+			handled = 0;
 			break;
 		case DHCPOFFER:	/* Offer received */
 			s->state = DEVST_DHCPREQ;
@@ -211,6 +244,9 @@ static int process_receive_event(struct state *s, time_t now)
 		case -1:	/* error */
 			s->state = DEVST_ERROR;
 			break;
+		case 0:
+			handled = 0;
+			break;
 		case DHCPACK:	/* ACK received */
 			s->state = DEVST_COMPLETE;
 			break;
@@ -221,6 +257,7 @@ static int process_receive_event(struct state *s, time_t now)
 		break;
 
 	default:
+		dprintf("\n");
 		handled = 0;
 		break;
 	}
@@ -296,28 +333,16 @@ struct netdev *ifaces;
 
 /*
  * Returns:
- *  0 = Error, packet not received or discarded
+ *  0 = No dhcp/bootp packet was received
  *  1 = A packet was received and handled
  */
 static int do_pkt_recv(int pkt_fd, time_t now)
 {
-	int ifindex, ret;
+	int ret = 0;
 	struct state *s;
 
-	ret = packet_peek(&ifindex);
-	if (ret == 0)
-		return ret;
-
-	for (s = slist; s; s = s->next) {
-		if (s->dev->ifindex == ifindex) {
-			ret = process_receive_event(s, now);
-			break;
-		}
-	}
-
-	if (ret == 0)
-		packet_discard();
-
+	for (s = slist; s; s = s->next)
+		ret |= process_receive_event(s, now);
 	return ret;
 }
 
@@ -327,7 +352,7 @@ static int loop(void)
 	struct pollfd fds[NR_FDS];
 	struct state *s;
 	int pkt_fd;
-	int nr = 0;
+	int nr = 0, rc = 0;
 	struct timeval now, prev;
 	time_t start;
 
@@ -350,7 +375,7 @@ static int loop(void)
 		int x;
 
 		for (s = slist; s; s = s->next) {
-			DEBUG(("%s: state = %d\n", s->dev->name, s->state));
+			dprintf("%s: state = %d\n", s->dev->name, s->state);
 
 			if (s->state == DEVST_COMPLETE) {
 				done++;
@@ -360,7 +385,7 @@ static int loop(void)
 			pending++;
 
 			if (s->expire - now.tv_sec <= 0) {
-				DEBUG(("timeout\n"));
+				dprintf("timeout\n");
 				process_timeout_event(s, now.tv_sec);
 			}
 
@@ -383,7 +408,7 @@ static int loop(void)
 			prev = now;
 			gettimeofday(&now, NULL);
 
-			if ((fds[0].revents & POLLRDNORM)) {
+			if ((nr > 0) && (fds[0].revents & POLLRDNORM)) {
 				if (do_pkt_recv(pkt_fd, now.tv_sec) == 1)
 					break;
 			}
@@ -392,21 +417,22 @@ static int loop(void)
 			    now.tv_sec - start >= loop_timeout) {
 				printf("IP-Config: no response after %d "
 				       "secs - giving up\n", loop_timeout);
+				rc = -1;
 				goto bail;
 			}
 
 			delta_ms = (now.tv_sec - prev.tv_sec) * 1000;
 			delta_ms += (now.tv_usec - prev.tv_usec) / 1000;
 
-			DEBUG(("Delta: %d ms\n", delta_ms));
+			dprintf("Delta: %d ms\n", delta_ms);
 
 			timeout_ms -= delta_ms;
 		}
 	}
-      bail:
+bail:
 	packet_close();
 
-	return 0;
+	return rc;
 }
 
 static int add_one_dev(struct netdev *dev)
@@ -424,13 +450,12 @@ static int add_one_dev(struct netdev *dev)
 	/*
 	 * Select the state that we start from.
 	 */
-	if (dev->caps & CAP_DHCP && dev->ip_addr == INADDR_ANY) {
+	if (dev->caps & CAP_DHCP && dev->ip_addr == INADDR_ANY)
 		state->restart_state = state->state = DEVST_DHCPDISC;
-	} else if (dev->caps & CAP_DHCP) {
+	else if (dev->caps & CAP_DHCP)
 		state->restart_state = state->state = DEVST_DHCPREQ;
-	} else if (dev->caps & CAP_BOOTP) {
+	else if (dev->caps & CAP_BOOTP)
 		state->restart_state = state->state = DEVST_BOOTP;
-	}
 
 	state->next = slist;
 	slist = state;
@@ -438,7 +463,7 @@ static int add_one_dev(struct netdev *dev)
 	return 0;
 }
 
-static void parse_addr(uint32_t * addr, const char *ip)
+static void parse_addr(uint32_t *addr, const char *ip)
 {
 	struct in_addr in;
 	if (inet_aton(ip, &in) == 0) {
@@ -470,7 +495,7 @@ static unsigned int parse_proto(const char *ip)
 		fprintf(stderr, "%s: invalid protocol '%s'\n", progname, ip);
 		longjmp(abort_buf, 1);
 	}
-      bail:
+bail:
 	return caps;
 }
 
@@ -479,10 +504,10 @@ static int add_all_devices(struct netdev *template);
 static int parse_device(struct netdev *dev, const char *ip)
 {
 	char *cp;
-	int i, opt;
+	int opt;
 	int is_ip = 0;
 
-	DEBUG(("IP-Config: parse_device: \"%s\"\n", ip));
+	dprintf("IP-Config: parse_device: \"%s\"\n", ip);
 
 	if (strncmp(ip, "ip=", 3) == 0) {
 		ip += 3;
@@ -501,7 +526,7 @@ static int parse_device(struct netdev *dev, const char *ip)
 			dev->name = ip;
 		}
 	} else {
-		for (i = opt = 0; ip && *ip; ip = cp, opt++) {
+		for (opt = 0; ip && *ip; ip = cp, opt++) {
 			if ((cp = strchr(ip, ':'))) {
 				*cp++ = '\0';
 			}
@@ -514,7 +539,7 @@ static int parse_device(struct netdev *dev, const char *ip)
 
 			if (*ip == '\0')
 				continue;
-			DEBUG(("IP-Config: opt #%d: '%s'\n", opt, ip));
+			dprintf("IP-Config: opt #%d: '%s'\n", opt, ip);
 			switch (opt) {
 			case 0:
 				parse_addr(&dev->ip_addr, ip);
@@ -532,7 +557,7 @@ static int parse_device(struct netdev *dev, const char *ip)
 			case 4:
 				strncpy(dev->hostname, ip, SYS_NMLN - 1);
 				dev->hostname[SYS_NMLN - 1] = '\0';
-				memcpy(dev->reqhostname, dev->hostname, 
+				memcpy(dev->reqhostname, dev->hostname,
 				       SYS_NMLN);
 				break;
 			case 5:
@@ -557,11 +582,10 @@ static int parse_device(struct netdev *dev, const char *ip)
 static void bringup_device(struct netdev *dev)
 {
 	if (netdev_up(dev) == 0) {
-		if (dev->caps) {
+		if (dev->caps)
 			add_one_dev(dev);
-		} else {
+		else
 			complete_device(dev);
-		}
 	}
 }
 
@@ -619,7 +643,7 @@ static struct netdev *add_device(const char *info)
 	       dev->caps & CAP_BOOTP ? " BOOTP" : "",
 	       dev->caps & CAP_RARP ? " RARP" : "");
 	return dev;
-      bail:
+bail:
 	free(dev);
 	return NULL;
 }
@@ -665,9 +689,10 @@ static int add_all_devices(struct netdev *template)
 		   logic the in-kernel ipconfig uses... */
 		if (!(flags & IFF_LOOPBACK) &&
 		    (flags & (IFF_BROADCAST | IFF_POINTOPOINT))) {
-			DEBUG(("Trying to bring up %s\n", de->d_name));
+			dprintf("Trying to bring up %s\n", de->d_name);
 
-			if (!(dev = add_device(de->d_name)))
+			dev = add_device(de->d_name);
+			if (!dev)
 				continue;
 			bringup_one_dev(template, dev);
 		}
@@ -720,7 +745,7 @@ int ipconfig_main(int argc, char *argv[])
 {
 	struct netdev *dev;
 	int c, port;
-	int err;
+	int err = 0;
 
 	/* If progname is set we're invoked from another program */
 	if (!progname) {
@@ -798,8 +823,8 @@ int ipconfig_main(int argc, char *argv[])
 			       "dest to %d\n",
 			       cfg_local_port, cfg_remote_port);
 		}
-		loop();
+		err = loop();
 	}
 
-	return 0;
+	return err;
 }

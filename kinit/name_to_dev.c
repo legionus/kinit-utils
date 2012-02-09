@@ -1,5 +1,4 @@
 #include <ctype.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -65,12 +64,12 @@ static dev_t try_name(char *name, int part)
 
 	/* if partition is within range - we got it */
 	if (part < range) {
-		DEBUG(("kinit: try_name %s,%d = %s\n", name, part,
-		       bdevname(res + part)));
+		dprintf("kinit: try_name %s,%d = %s\n", name, part,
+			bdevname(res + part));
 		return res + part;
 	}
 
-      fail:
+fail:
 	return (dev_t) 0;
 }
 
@@ -123,8 +122,8 @@ static inline dev_t name_to_dev_t_real(const char *name)
 		return st.st_rdev;
 
 	if (strncmp(name, "/dev/", 5)) {
-		if ((cptr = strchr(devname+5, ':')) &&
-		    cptr[1] != '\0') {
+		cptr = strchr(devname+5, ':');
+		if (cptr && cptr[1] != '\0') {
 			/* Colon-separated decimal device number */
 			*cptr = '\0';
 			major_num = strtoul(devname+5, &e1, 10);
@@ -186,7 +185,7 @@ dev_t name_to_dev_t(const char *name)
 {
 	dev_t dev = name_to_dev_t_real(name);
 
-	DEBUG(("kinit: name_to_dev_t(%s) = %s\n", name, bdevname(dev)));
+	dprintf("kinit: name_to_dev_t(%s) = %s\n", name, bdevname(dev));
 	return dev;
 }
 
