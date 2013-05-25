@@ -1,0 +1,50 @@
+--- kinit/ipconfig/main.c.fix8	2013-05-26 00:00:35.912995570 +0400
++++ kinit/ipconfig/main.c	2013-05-26 00:37:18.485686633 +0400
+@@ -29,8 +29,9 @@ static char do_not_config;
+ static unsigned int default_caps = CAP_DHCP | CAP_BOOTP | CAP_RARP;
+ static int loop_timeout = -1;
+ static int configured;
+ static int bringup_first = 0;
++static int bringup_flag = 0;
+ static int do_readonly = 0;
+ static int do_quiet = 0;
+ 
+ /* DHCP vendor class identifier */
+@@ -779,9 +780,9 @@ int ipconfig_main(int argc, char *argv[]
+ 	/* Default vendor identifier */
+ 	set_vendor_identifier("Linux ipconfig");
+ 
+ 	do {
+-		c = getopt(argc, argv, "c:d:i:onp:rt:q");
++		c = getopt(argc, argv, "c:D:d:i:onp:rt:q");
+ 		if (c == EOF)
+ 			break;
+ 
+ 		switch (c) {
+@@ -822,8 +823,14 @@ int ipconfig_main(int argc, char *argv[]
+ 			break;
+ 		case 'q':
+ 			do_quiet = 1;
+ 			break;
++		case 'D':
++			bringdown_flag = 1;
++			dev = add_device(optarg);
++			if (dev)
++				netdev_down(dev);
++			break;
+ 		case 'd':
+ 			dev = add_device(optarg);
+ 			if (dev)
+ 				bringup_device(dev);
+@@ -834,8 +841,11 @@ int ipconfig_main(int argc, char *argv[]
+ 			longjmp(abort_buf, 1);
+ 		}
+ 	} while (1);
+ 
++	if (bringdown_flag)
++		return err;
++
+ 	for (c = optind; c < argc; c++) {
+ 		dev = add_device(argv[c]);
+ 		if (dev)
+ 			bringup_device(dev);
