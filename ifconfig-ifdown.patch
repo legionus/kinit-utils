@@ -5,7 +5,7 @@
  static int loop_timeout = -1;
  static int configured;
  static int bringup_first = 0;
-+static int bringup_flag = 0;
++static int bringdown_flag = 0;
  static int do_readonly = 0;
  static int do_quiet = 0;
  

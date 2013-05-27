@@ -57,7 +57,7 @@ rm -f %buildroot/lib/initrd/bin/fstype
 /lib/initrd
 
 %changelog
-* Sun May 26 2013 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt2
+* Mon May 27 2013 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt2
 - ipconfig: Add -D option.
 
 * Thu Feb 09 2012 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt1
