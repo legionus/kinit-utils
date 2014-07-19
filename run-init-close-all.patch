@@ -1,0 +1,66 @@
+--- kinit/Makefile.fix9	2014-07-18 17:06:00.057365937 +0400
++++ kinit/Makefile	2014-07-18 17:06:00.070365764 +0400
+@@ -4,9 +4,9 @@ objs  = name_to_dev.o devname.o getarg.o
+ objs += kinit.o do_mounts.o ramdisk_load.o initrd.o
+ objs += getintfile.o readfile.o xpio.o
+ objs += do_mounts_md.o do_mounts_mtd.o nfsroot.o
+ 
+-CFLAGS  += -Os -I. -D_GNU_SOURCE -ffunction-sections -fdata-sections
++CFLAGS  += -Os -I. -D_GNU_SOURCE -DHAVE_SYSCONF -ffunction-sections -fdata-sections
+ LDFLAGS += -Wl,--gc-sections -Wl,--print-gc-sections
+ 
+ subdirs += ipconfig
+ subdirs += nfsmount
+--- kinit/run-init/runinitlib.c.fix9	2014-07-18 17:06:00.061365884 +0400
++++ kinit/run-init/runinitlib.c	2014-07-23 20:07:55.767421275 +0400
+@@ -48,13 +48,18 @@
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <sys/mount.h>
++#include <sys/param.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <sys/vfs.h>
+ #include "run-init.h"
+ 
++#ifndef OPEN_MAX
++# define OPEN_MAX 256
++#endif
++
+ /* Make it possible to compile on glibc by including constants that the
+    always-behind shipped glibc headers may not include.  Classic example
+    on why the lack of ABI headers screw us up. */
+ #ifndef TMPFS_MAGIC
+@@ -193,8 +198,9 @@ const char *run_init(const char *realroo
+ {
+ 	struct stat rst, cst;
+ 	struct statfs sfs;
+ 	int confd;
++	int maxfd;
+ 
+ 	if (envfile && set_environ(envfile))
+ 		return "can't setup environ";
+ 
+@@ -238,9 +244,20 @@ const char *run_init(const char *realroo
+ 		return "opening console";
+ 	dup2(confd, 0);
+ 	dup2(confd, 1);
+ 	dup2(confd, 2);
+-	close(confd);
++
++#ifdef HAVE_SYSCONF
++	maxfd = (int) sysconf(_SC_OPEN_MAX);
++#else
++	maxfd = getdtablesize();
++#endif /* HAVE_SYSCONF */
++
++	if (maxfd < 0)
++		maxfd = OPEN_MAX;
++	maxfd--;
++	while (maxfd > 2)
++		close(maxfd--);
+ 
+ 	/* Spawn init */
+ 	execv(init, initargs);
+ 	return init;		/* Failed to spawn init */

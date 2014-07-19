@@ -1,6 +1,6 @@
 Name: kinit-utils
 Version: 1.5.25
-Release: alt2
+Release: alt3
 
 Summary: Small utilities built with klibc
 License: BSD/GPL
@@ -18,6 +18,7 @@ Patch5:  ifconfig-quiet.patch
 Patch6:  halt.patch
 Patch7:  run-init-env.patch
 Patch8:  ifconfig-ifdown.patch
+Patch9:  run-init-close-all.patch
 
 # Automatically added by buildreq on Wed Nov 11 2009
 BuildRequires: libcap-devel zlib-devel
@@ -40,6 +41,7 @@ embedded systems.
 %patch6 -p0 -b .fix6
 %patch7 -p0 -b .fix7
 %patch8 -p0 -b .fix8
+%patch9 -p0 -b .fix9
 
 %build
 %make_build
@@ -57,6 +59,9 @@ rm -f %buildroot/lib/initrd/bin/fstype
 /lib/initrd
 
 %changelog
+* Sun Jul 20 2014 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt3
+- run-init: Close all descriptors.
+
 * Mon May 27 2013 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt2
 - ipconfig: Add -D option.
 
