@@ -1,6 +1,6 @@
 Name: kinit-utils
 Version: 1.5.25
-Release: alt3
+Release: alt4
 
 Summary: Small utilities built with klibc
 License: BSD/GPL
@@ -19,6 +19,7 @@ Patch6:  halt.patch
 Patch7:  run-init-env.patch
 Patch8:  ifconfig-ifdown.patch
 Patch9:  run-init-close-all.patch
+Patch10: run-init-reset-signals.patch
 
 # Automatically added by buildreq on Wed Nov 11 2009
 BuildRequires: libcap-devel zlib-devel
@@ -42,6 +43,7 @@ embedded systems.
 %patch7 -p0 -b .fix7
 %patch8 -p0 -b .fix8
 %patch9 -p0 -b .fix9
+%patch10 -p0 -b .fix10
 
 %build
 %make_build
@@ -59,6 +61,9 @@ rm -f %buildroot/lib/initrd/bin/fstype
 /lib/initrd
 
 %changelog
+* Sat Aug 23 2014 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt4
+- run-init: Reset all signals.
+
 * Sun Jul 20 2014 Alexey Gladkov <legion@altlinux.ru> 1.5.25-alt3
 - run-init: Close all descriptors.
 
